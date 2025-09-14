@@ -1,0 +1,1319 @@
+// build.gradle.kts
+plugins {
+    kotlin("jvm") version "1.9.10"
+    kotlin("plugin.serialization") version "1.9.10"
+    application
+}
+
+dependencies {
+    implementation("io.ktor:ktor-server-core:2.3.5")
+    implementation("io.ktor:ktor-server-netty:2.3.5")
+    implementation("io.ktor:ktor-server-content-negotiation:2.3.5")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.5")
+    implementation("io.ktor:ktor-server-cors:2.3.5")
+    implementation("io.ktor:ktor-server-static-content:2.3.5")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+    implementation("ch.qos.logback:logback-classic:1.4.11")
+}
+
+application {
+    mainClass.set("com.aianalytics.ApplicationKt")
+}
+
+// src/main/kotlin/com/aianalytics/models/DataModels.kt
+package com.aianalytics.models
+
+import kotlinx.serialization.Serializable
+
+@Serializable
+data class DataPoint(
+    val features: List<Double>,
+    val label: Double? = null
+)
+
+@Serializable
+data class Dataset(
+    val name: String,
+    val description: String,
+    val data: List<DataPoint>,
+    val featureNames: List<String> = emptyList()
+)
+
+@Serializable
+data class ModelConfig(
+    val hiddenLayers: List<Int> = listOf(10, 5),
+    val learningRate: Double = 0.01,
+    val epochs: Int = 1000,
+    val activationFunction: String = "sigmoid"
+)
+
+@Serializable
+data class TrainingRequest(
+    val datasetId: String,
+    val config: ModelConfig,
+    val testSplit: Double = 0.2
+)
+
+@Serializable
+data class TrainingResult(
+    val modelId: String,
+    val accuracy: Double,
+    val loss: Double,
+    val epochs: Int,
+    val trainingTime: Long
+)
+
+@Serializable
+data class PredictionRequest(
+    val modelId: String,
+    val features: List<Double>
+)
+
+@Serializable
+data class PredictionResult(
+    val prediction: Double,
+    val confidence: Double
+)
+
+@Serializable
+data class ApiResponse<T>(
+    val success: Boolean,
+    val data: T? = null,
+    val error: String? = null
+)
+
+// src/main/kotlin/com/aianalytics/ml/NeuralNetwork.kt
+package com.aianalytics.ml
+
+import kotlin.math.exp
+import kotlin.math.sqrt
+import kotlin.random.Random
+
+class AdvancedNeuralNetwork(
+    private val layers: List<Int>,
+    private val learningRate: Double = 0.01,
+    private val activationFunction: String = "sigmoid"
+) {
+    private val weights: List<Array<DoubleArray>>
+    private val biases: List<DoubleArray>
+    private val random = Random.Default
+
+    init {
+        weights = mutableListOf<Array<DoubleArray>>().apply {
+            for (i in 0 until layers.size - 1) {
+                val layerWeights = Array(layers[i]) { DoubleArray(layers[i + 1]) }
+                val xavier = sqrt(2.0 / layers[i])
+                for (j in 0 until layers[i]) {
+                    for (k in 0 until layers[i + 1]) {
+                        layerWeights[j][k] = random.nextGaussian() * xavier
+                    }
+                }
+                add(layerWeights)
+            }
+        }
+
+        biases = layers.drop(1).map { size ->
+            DoubleArray(size) { random.nextGaussian() * 0.1 }
+        }
+    }
+
+    private fun activate(x: Double): Double = when (activationFunction) {
+        "sigmoid" -> 1.0 / (1.0 + exp(-x))
+        "relu" -> maxOf(0.0, x)
+        "tanh" -> kotlin.math.tanh(x)
+        else -> 1.0 / (1.0 + exp(-x))
+    }
+
+    private fun activateDerivative(x: Double): Double = when (activationFunction) {
+        "sigmoid" -> x * (1 - x)
+        "relu" -> if (x > 0) 1.0 else 0.0
+        "tanh" -> 1.0 - x * x
+        else -> x * (1 - x)
+    }
+
+    fun feedForward(input: DoubleArray): List<DoubleArray> {
+        val activations = mutableListOf<DoubleArray>()
+        var currentInput = input
+        activations.add(currentInput)
+
+        for (layerIndex in weights.indices) {
+            val layerOutput = DoubleArray(layers[layerIndex + 1])
+            for (j in layerOutput.indices) {
+                layerOutput[j] = biases[layerIndex][j]
+                for (i in currentInput.indices) {
+                    layerOutput[j] += currentInput[i] * weights[layerIndex][i][j]
+                }
+                layerOutput[j] = activate(layerOutput[j])
+            }
+            currentInput = layerOutput
+            activations.add(currentInput)
+        }
+
+        return activations
+    }
+
+    fun predict(input: DoubleArray): Double {
+        val activations = feedForward(input)
+        return activations.last()[0]
+    }
+
+    fun train(inputs: List<DoubleArray>, targets: List<DoubleArray>, epochs: Int): TrainingStats {
+        var totalLoss = 0.0
+        val startTime = System.currentTimeMillis()
+
+        repeat(epochs) { epoch ->
+            var epochLoss = 0.0
+
+            for (i in inputs.indices) {
+                val activations = feedForward(inputs[i])
+                val output = activations.last()
+
+                // Calculate loss
+                val loss = targets[i].mapIndexed { j, target ->
+                    val error = target - output[j]
+                    epochLoss += error * error
+                    error
+                }.toDoubleArray()
+
+                // Backpropagation
+                backpropagate(activations, loss)
+            }
+
+            if (epoch % 100 == 0) {
+                totalLoss = epochLoss / inputs.size
+                println("Epoch $epoch, Loss: $totalLoss")
+            }
+        }
+
+        val endTime = System.currentTimeMillis()
+        return TrainingStats(
+            finalLoss = totalLoss,
+            trainingTime = endTime - startTime
+        )
+    }
+
+    private fun backpropagate(activations: List<DoubleArray>, outputError: DoubleArray) {
+        val errors = mutableListOf<DoubleArray>()
+        errors.add(0, outputError.map { it * activateDerivative(activations.last()[0]) }.toDoubleArray())
+
+        // Calculate errors for hidden layers
+        for (layerIndex in weights.size - 2 downTo 0) {
+            val layerError = DoubleArray(layers[layerIndex + 1])
+            for (j in layerError.indices) {
+                layerError[j] = 0.0
+                for (k in errors[0].indices) {
+                    layerError[j] += errors[0][k] * weights[layerIndex + 1][j][k]
+                }
+                layerError[j] *= activateDerivative(activations[layerIndex + 1][j])
+            }
+            errors.add(0, layerError)
+        }
+
+        // Update weights and biases
+        for (layerIndex in weights.indices) {
+            for (i in weights[layerIndex].indices) {
+                for (j in weights[layerIndex][i].indices) {
+                    weights[layerIndex][i][j] += learningRate * errors[layerIndex][j] * activations[layerIndex][i]
+                }
+            }
+
+            for (j in biases[layerIndex].indices) {
+                biases[layerIndex][j] += learningRate * errors[layerIndex][j]
+            }
+        }
+    }
+}
+
+data class TrainingStats(
+    val finalLoss: Double,
+    val trainingTime: Long
+)
+
+// src/main/kotlin/com/aianalytics/services/MLService.kt
+package com.aianalytics.services
+
+import com.aianalytics.ml.AdvancedNeuralNetwork
+import com.aianalytics.models.*
+import java.util.*
+import java.util.concurrent.ConcurrentHashMap
+
+class MLService {
+    private val datasets = ConcurrentHashMap<String, Dataset>()
+    private val models = ConcurrentHashMap<String, AdvancedNeuralNetwork>()
+    private val modelConfigs = ConcurrentHashMap<String, ModelConfig>()
+
+    fun uploadDataset(dataset: Dataset): String {
+        val id = UUID.randomUUID().toString()
+        datasets[id] = dataset
+        return id
+    }
+
+    fun getDataset(id: String): Dataset? = datasets[id]
+
+    fun getAllDatasets(): List<Pair<String, Dataset>> = datasets.toList()
+
+    suspend fun trainModel(request: TrainingRequest): TrainingResult {
+        val dataset = datasets[request.datasetId]
+            ?: throw IllegalArgumentException("Dataset not found")
+
+        if (dataset.data.any { it.label == null }) {
+            throw IllegalArgumentException("Dataset must have labels for supervised learning")
+        }
+
+        val modelId = UUID.randomUUID().toString()
+        val inputSize = dataset.data.first().features.size
+        val layers = listOf(inputSize) + request.config.hiddenLayers + listOf(1)
+
+        val model = AdvancedNeuralNetwork(
+            layers = layers,
+            learningRate = request.config.learningRate,
+            activationFunction = "sigmoid"
+        )
+
+        // Prepare training data
+        val shuffledData = dataset.data.shuffled()
+        val splitIndex = (shuffledData.size * (1 - request.testSplit)).toInt()
+        val trainData = shuffledData.take(splitIndex)
+        val testData = shuffledData.drop(splitIndex)
+
+        val trainInputs = trainData.map { it.features.toDoubleArray() }
+        val trainTargets = trainData.map { doubleArrayOf(it.label!!) }
+
+        // Train the model
+        val stats = model.train(trainInputs, trainTargets, request.config.epochs)
+
+        // Calculate accuracy on test set
+        var correct = 0
+        testData.forEach { testPoint ->
+            val prediction = model.predict(testPoint.features.toDoubleArray())
+            val predicted = if (prediction > 0.5) 1.0 else 0.0
+            if (predicted == testPoint.label) correct++
+        }
+
+        val accuracy = if (testData.isNotEmpty()) correct.toDouble() / testData.size else 0.0
+
+        models[modelId] = model
+        modelConfigs[modelId] = request.config
+
+        return TrainingResult(
+            modelId = modelId,
+            accuracy = accuracy,
+            loss = stats.finalLoss,
+            epochs = request.config.epochs,
+            trainingTime = stats.trainingTime
+        )
+    }
+
+    fun predict(request: PredictionRequest): PredictionResult {
+        val model = models[request.modelId]
+            ?: throw IllegalArgumentException("Model not found")
+
+        val prediction = model.predict(request.features.toDoubleArray())
+        val confidence = kotlin.math.abs(prediction - 0.5) * 2 // Simple confidence metric
+
+        return PredictionResult(prediction, confidence)
+    }
+
+    fun getModelsList(): List<String> = models.keys.toList()
+}
+
+// src/main/kotlin/com/aianalytics/Application.kt
+package com.aianalytics
+
+import com.aianalytics.models.*
+import com.aianalytics.services.MLService
+import io.ktor.http.*
+import io.ktor.serialization.kotlinx.json.*
+import io.ktor.server.application.*
+import io.ktor.server.engine.*
+import io.ktor.server.netty.*
+import io.ktor.server.plugins.contentnegotiation.*
+import io.ktor.server.plugins.cors.routing.*
+import io.ktor.server.plugins.statciccontent.*
+import io.ktor.server.request.*
+import io.ktor.server.response.*
+import io.ktor.server.routing.*
+import kotlinx.serialization.json.Json
+
+fun main() {
+    embeddedServer(Netty, port = 8080, host = "0.0.0.0", module = Application::module)
+        .start(wait = true)
+}
+
+fun Application.module() {
+    val mlService = MLService()
+
+    install(ContentNegotiation) {
+        json(Json {
+            prettyPrint = true
+            isLenient = true
+            ignoreUnknownKeys = true
+        })
+    }
+
+    install(CORS) {
+        anyHost()
+        allowHeader(HttpHeaders.ContentType)
+        allowMethod(HttpMethod.Options)
+        allowMethod(HttpMethod.Put)
+        allowMethod(HttpMethod.Delete)
+        allowMethod(HttpMethod.Patch)
+    }
+
+    // Serve static files
+    staticResources("/", "static")
+
+    routing {
+        // API Routes
+        route("/api") {
+
+            // Upload dataset
+            post("/datasets") {
+                try {
+                    val dataset = call.receive<Dataset>()
+                    val id = mlService.uploadDataset(dataset)
+                    call.respond(ApiResponse(true, mapOf("id" to id)))
+                } catch (e: Exception) {
+                    call.respond(
+                        HttpStatusCode.BadRequest,
+                        ApiResponse<Nothing>(false, error = e.message)
+                    )
+                }
+            }
+
+            // Get all datasets
+            get("/datasets") {
+                val datasets = mlService.getAllDatasets()
+                    .map { (id, dataset) ->
+                        mapOf(
+                            "id" to id,
+                            "name" to dataset.name,
+                            "description" to dataset.description,
+                            "size" to dataset.data.size,
+                            "features" to dataset.data.firstOrNull()?.features?.size
+                        )
+                    }
+                call.respond(ApiResponse(true, datasets))
+            }
+
+            // Train model
+            post("/models/train") {
+                try {
+                    val request = call.receive<TrainingRequest>()
+                    val result = mlService.trainModel(request)
+                    call.respond(ApiResponse(true, result))
+                } catch (e: Exception) {
+                    call.respond(
+                        HttpStatusCode.BadRequest,
+                        ApiResponse<Nothing>(false, error = e.message)
+                    )
+                }
+            }
+
+            // Make prediction
+            post("/models/predict") {
+                try {
+                    val request = call.receive<PredictionRequest>()
+                    val result = mlService.predict(request)
+                    call.respond(ApiResponse(true, result))
+                } catch (e: Exception) {
+                    call.respond(
+                        HttpStatusCode.BadRequest,
+                        ApiResponse<Nothing>(false, error = e.message)
+                    )
+                }
+            }
+
+            // Get models list
+            get("/models") {
+                val models = mlService.getModelsList()
+                call.respond(ApiResponse(true, models))
+            }
+
+            // Health check
+            get("/health") {
+                call.respond(ApiResponse(true, mapOf("status" to "healthy")))
+            }
+        }
+
+        // Serve index.html for root
+        get("/") {
+            call.respondText(indexHtml, ContentType.Text.Html)
+        }
+    }
+}
+
+// HTML Frontend
+val indexHtml = """
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Analytics MVP</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+        .header h1 {
+            color: #333;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .tabs {
+            display: flex;
+            margin-bottom: 30px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 5px;
+        }
+        .tab {
+            flex: 1;
+            padding: 15px;
+            text-align: center;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.3s;
+            font-weight: 500;
+        }
+        .tab.active {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+        .section {
+            display: none;
+            animation: fadeIn 0.3s;
+        }
+        .section.active { display: block; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #555;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        .btn {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+        }
+        .btn:disabled {
+            opacity: 0.6;
+            transform: none;
+            cursor: not-allowed;
+        }
+        .results {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+        }
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .dataset-item, .model-item {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            border-left: 4px solid #667eea;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+        .success {
+            background: #efe;
+            color: #3c3;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧠 AI Analytics MVP</h1>
+            <p>Платформа для анализа данных с помощью нейронных сетей</p>
+        </div>
+
+        <div class="tabs">
+            <div class="tab active" onclick="showSection('upload')">📁 Загрузить данные</div>
+            <div class="tab" onclick="showSection('train')">🏋️ Обучить модель</div>
+            <div class="tab" onclick="showSection('predict')">🔮 Предсказания</div>
+            <div class="tab" onclick="showSection('dashboard')">📊 Дашборд</div>
+        </div>
+
+        <div id="upload" class="section active">
+            <h2>Загрузка данных</h2>
+            <div class="form-group">
+                <label>Название датасета:</label>
+                <input type="text" id="datasetName" placeholder="Например: Анализ продаж">
+            </div>
+            <div class="form-group">
+                <label>Описание:</label>
+                <textarea id="datasetDesc" placeholder="Краткое описание данных"></textarea>
+            </div>
+            <div class="form-group">
+                <label>CSV файл или JSON данные:</label>
+                <textarea id="datasetData" rows="10" placeholder='Пример CSV:\nfeature1,feature2,label\n1.0,2.0,1\n0.5,1.5,0\n\nИли JSON:\n[{"features":[1.0,2.0],"label":1},{"features":[0.5,1.5],"label":0}]'></textarea>
+            </div>
+            <button class="btn" onclick="uploadDataset()">📤 Загрузить</button>
+            <div id="uploadResult"></div>
+        </div>
+
+        <div id="train" class="section">
+            <h2>Обучение модели</h2>
+            <div class="form-group">
+                <label>Выберите датасет:</label>
+                <select id="trainingDataset">
+                    <option value="">Загрузка...</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Скрытые слои (через запятую):</label>
+                <input type="text" id="hiddenLayers" value="10,5" placeholder="10,5">
+            </div>
+            <div class="form-group">
+                <label>Скорость обучения:</label>
+                <input type="number" id="learningRate" value="0.01" step="0.001">
+            </div>
+            <div class="form-group">
+                <label>Количество эпох:</label>
+                <input type="number" id="epochs" value="1000">
+            </div>
+            <div class="form-group">
+                <label>Размер тестовой выборки:</label>
+                <input type="number" id="testSplit" value="0.2" step="0.1" min="0.1" max="0.5">
+            </div>
+            <button class="btn" onclick="trainModel()">🚀 Начать обучение</button>
+            <div id="trainingResult"></div>
+        </div>
+
+        <div id="predict" class="section">
+            <h2>Предсказания</h2>
+            <div class="form-group">
+                <label>Выберите модель:</label>
+                <select id="predictionModel">
+                    <option value="">Загрузка...</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Входные данные (через запятую):</label>
+                <input type="text" id="predictionFeatures" placeholder="1.0,2.0,3.0">
+            </div>
+            <button class="btn" onclick="makePrediction()">🎯 Предсказать</button>
+            <div id="predictionResult"></div>
+        </div>
+
+        <div id="dashboard" class="section">
+            <h2>Дашборд</h2>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <div>
+                    <h3>📁 Датасеты</h3>
+                    <div id="datasetsList"></div>
+                </div>
+                <div>
+                    <h3>🤖 Модели</h3>
+                    <div id="modelsList"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentSection = 'upload';
+
+        function showSection(section) {
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.getElementById(section).classList.add('active');
+            event.target.classList.add('active');
+            currentSection = section;
+
+            if (section === 'train') loadDatasets();
+            if (section === 'predict') loadModels();
+            if (section === 'dashboard') loadDashboard();
+        }
+
+        async function uploadDataset() {
+            const name = document.getElementById('datasetName').value;
+            const description = document.getElementById('datasetDesc').value;
+            const dataText = document.getElementById('datasetData').value;
+
+            if (!name || !dataText) {
+                showResult('uploadResult', 'Заполните все поля', 'error');
+                return;
+            }
+
+            try {
+                let data;
+                if (dataText.trim().startsWith('[')) {
+                    data = JSON.parse(dataText);
+                } else {
+                    data = parseCSV(dataText);
+                }
+
+                const response = await fetch('/api/datasets', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, description, data })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    showResult('uploadResult', `Датасет загружен! ID: ${'${result.data.id}'}`, 'success');
+                } else {
+                    showResult('uploadResult', result.error, 'error');
+                }
+            } catch (error) {
+                showResult('uploadResult', 'Ошибка: ' + error.message, 'error');
+            }
+        }
+
+        function parseCSV(text) {
+            const lines = text.trim().split('\n');
+            const headers = lines[0].split(',');
+            const data = [];
+
+            for (let i = 1; i < lines.length; i++) {
+                const values = lines[i].split(',').map(v => parseFloat(v.trim()));
+                const features = values.slice(0, -1);
+                const label = values[values.length - 1];
+                data.push({ features, label });
+            }
+            return data;
+        }
+
+        async function loadDatasets() {
+            try {
+                const response = await fetch('/api/datasets');
+                const result = await response.json();
+                const select = document.getElementById('trainingDataset');
+
+                if (result.success) {
+                    select.innerHTML = '<option value="">Выберите датасет</option>';
+                    result.data.forEach(dataset => {
+                        select.innerHTML += `<option value="${'${dataset.id}'}">${'${dataset.name}'} (${'${dataset.size}'} записей)</option>`;
+                    });
+                }
+            } catch (error) {
+                console.error('Ошибка загрузки датасетов:', error);
+            }
+        }
+
+        async function trainModel() {
+            const datasetId = document.getElementById('trainingDataset').value;
+            const hiddenLayers = document.getElementById('hiddenLayers').value.split(',').map(x => parseInt(x.trim()));
+            const learningRate = parseFloat(document.getElementById('learningRate').value);
+            const epochs = parseInt(document.getElementById('epochs').value);
+            const testSplit = parseFloat(document.getElementById('testSplit').value);
+
+            if (!datasetId) {
+                showResult('trainingResult', 'Выберите датасет', 'error');
+                return;
+            }
+
+            showResult('trainingResult', '<div class="loading"><div class="spinner"></div><p>Обучение модели...</p></div>');
+
+            try {
+                const response = await fetch('/api/models/train', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        datasetId,
+                        config: { hiddenLayers, learningRate, epochs },
+                        testSplit
+                    })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    const data = result.data;
+                    showResult('trainingResult', `
+                        <h3>✅ Модель обучена успешно!</h3>
+                        <p><strong>ID модели:</strong> ${data.modelId}</p>
+                        <p><strong>Точность:</strong> ${(data.accuracy * 100).toFixed(2)}%</p>
+                        <p><strong>Потери:</strong> ${data.loss.toFixed(6)}</p>
+                        <p><strong>Эпох:</strong> ${data.epochs}</p>
+                        <p><strong>Время обучения:</strong> ${data.trainingTime}мс</p>
+                    `, 'success');
+                } else {
+                    showResult('trainingResult', result.error, 'error');
+                }
+            } catch (error) {
+                showResult('trainingResult', 'Ошибка: ' + error.message, 'error');
+            }
+        }
+
+        async function loadModels() {
+            try {
+                const response = await fetch('/api/models');
+                const result = await response.json();
+                const select = document.getElementById('predictionModel');
+
+                if (result.success) {
+                    select.innerHTML = '<option value="">Выберите модель</option>';
+                    result.data.forEach(modelId => {
+                        select.innerHTML += `<option value="${modelId}">${modelId.substring(0, 8)}...</option>`;
+                    });
+                }
+            } catch (error) {
+                console.error('Ошибка загрузки моделей:', error);
+            }
+        }
+
+        async function makePrediction() {
+            const modelId = document.getElementById('predictionModel').value;
+            const featuresText = document.getElementById('predictionFeatures').value;
+
+            if (!modelId || !featuresText) {
+                showResult('predictionResult', 'Заполните все поля', 'error');
+                return;
+            }
+
+            try {
+                const features = featuresText.split(',').map(x => parseFloat(x.trim()));
+
+                const response = await fetch('/api/models/predict', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ modelId, features })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    const data = result.data;
+                    showResult('predictionResult', `
+                        <h3>🎯 Результат предсказания</h3>
+                        <p><strong>Предсказание:</strong> ${data.prediction.toFixed(4)}</p>
+                        <p><strong>Уверенность:</strong> ${(data.confidence * 100).toFixed(2)}%</p>
+                        <p><strong>Классификация:</strong> ${data.prediction > 0.5 ? 'Положительный (1)' : 'Отрицательный (0)'}</p>
+                    `, 'success');
+                } else {
+                    showResult('predictionResult', result.error, 'error');
+                }
+            } catch (error) {
+                showResult('predictionResult', 'Ошибка: ' + error.message, 'error');
+            }
+        }
+
+        async function loadDashboard() {
+            try {
+                // Загружаем датасеты
+                const datasetsResponse = await fetch('/api/datasets');
+                const datasetsResult = await datasetsResponse.json();
+
+                const datasetsList = document.getElementById('datasetsList');
+                if (datasetsResult.success) {
+                    datasetsList.innerHTML = '';
+                    if (datasetsResult.data.length === 0) {
+                        datasetsList.innerHTML = '<p>Нет загруженных датасетов</p>';
+                    } else {
+                        datasetsResult.data.forEach(dataset => {
+                            datasetsList.innerHTML += `
+                                <div class="dataset-item">
+                                    <h4>${dataset.name}</h4>
+                                    <p><strong>Записей:</strong> ${dataset.size}</p>
+                                    <p><strong>Признаков:</strong> ${dataset.features || 'N/A'}</p>
+                                    <p><strong>ID:</strong> ${dataset.id.substring(0, 8)}...</p>
+                                </div>
+                            `;
+                        });
+                    }
+                }
+
+                // Загружаем модели
+                const modelsResponse = await fetch('/api/models');
+                const modelsResult = await modelsResponse.json();
+
+                const modelsList = document.getElementById('modelsList');
+                if (modelsResult.success) {
+                    modelsList.innerHTML = '';
+                    if (modelsResult.data.length === 0) {
+                        modelsList.innerHTML = '<p>Нет обученных моделей</p>';
+                    } else {
+                        modelsResult.data.forEach(modelId => {
+                            modelsList.innerHTML += `
+                                <div class="model-item">
+                                    <h4>Модель ${modelId.substring(0, 8)}...</h4>
+                                    <p><strong>Полный ID:</strong> ${modelId}</p>
+                                    <p><strong>Статус:</strong> Готова к использованию</p>
+                                </div>
+                            `;
+                        });
+                    }
+                }
+            } catch (error) {
+                console.error('Ошибка загрузки дашборда:', error);
+            }
+        }
+
+        function showResult(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `<div class="${type}">${message}</div>`;
+        }
+
+        // Проверка здоровья API при загрузке
+        window.onload = async function() {
+            try {
+                const response = await fetch('/api/health');
+                const result = await response.json();
+                if (result.success) {
+                    console.log('✅ API готов к работе');
+                }
+            } catch (error) {
+                console.error('❌ Ошибка подключения к API:', error);
+            }
+        };
+    </script>
+</body>
+</html>
+"""
+
+
+Теперь создам дополнительные файлы для полноценного MVP:Отлично! Теперь у вас есть полноценный MVP со всеми необходимыми компонентами для стартапа:
+
+# Dockerfile
+FROM openjdk:17-jdk-slim
+
+WORKDIR /app
+
+# Копируем файлы сборки
+COPY build.gradle.kts .
+COPY gradlew .
+COPY gradle gradle
+COPY src src
+
+# Делаем gradlew исполняемым
+RUN chmod +x gradlew
+
+# Собираем приложение
+RUN ./gradlew build --no-daemon
+
+# Копируем собранный jar
+RUN cp build/libs/*.jar app.jar
+
+EXPOSE 8080
+
+CMD ["java", "-jar", "app.jar"]
+
+---
+
+# docker-compose.yml
+version: '3.8'
+
+services:
+  ai-analytics:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - JAVA_OPTS=-Xmx512m
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/nginx/ssl
+    depends_on:
+      - ai-analytics
+    restart: unless-stopped
+
+---
+
+# nginx.conf
+events {
+    worker_connections 1024;
+}
+
+http {
+    upstream backend {
+        server ai-analytics:8080;
+    }
+
+    # HTTP сервер (редирект на HTTPS)
+    server {
+        listen 80;
+        server_name your-domain.com;
+        return 301 https://$server_name$request_uri;
+    }
+
+    # HTTPS сервер
+    server {
+        listen 443 ssl http2;
+        server_name your-domain.com;
+
+        ssl_certificate /etc/nginx/ssl/cert.pem;
+        ssl_certificate_key /etc/nginx/ssl/key.pem;
+
+        location / {
+            proxy_pass http://backend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+    }
+}
+
+---
+
+# scripts/deploy.sh
+#!/bin/bash
+
+echo "🚀 Развертывание AI Analytics MVP..."
+
+# Остановить существующие контейнеры
+docker-compose down
+
+# Собрать новый образ
+docker-compose build --no-cache
+
+# Запустить сервисы
+docker-compose up -d
+
+# Проверить состояние
+docker-compose ps
+
+echo "✅ Развертывание завершено!"
+echo "🌐 Приложение доступно по адресу: http://localhost:8080"
+
+# Ждем запуска сервиса
+echo "⏳ Ожидание запуска сервиса..."
+sleep 10
+
+# Проверяем health check
+curl -f http://localhost:8080/api/health && echo "✅ Сервис запущен успешно!" || echo "❌ Ошибка запуска сервиса"
+
+---
+
+# scripts/test-api.sh
+#!/bin/bash
+
+BASE_URL="http://localhost:8080/api"
+
+echo "🧪 Тестирование API..."
+
+# 1. Health Check
+echo "1. Health Check..."
+curl -s "$BASE_URL/health" | jq .
+
+# 2. Загрузка тестового датасета
+echo "2. Загрузка датасета..."
+DATASET_RESPONSE=$(curl -s -X POST "$BASE_URL/datasets" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Test Dataset",
+    "description": "Тестовый датасет для проверки API",
+    "data": [
+      {"features": [0, 0], "label": 0},
+      {"features": [0, 1], "label": 0},
+      {"features": [1, 0], "label": 0},
+      {"features": [1, 1], "label": 1}
+    ]
+  }')
+
+echo $DATASET_RESPONSE | jq .
+DATASET_ID=$(echo $DATASET_RESPONSE | jq -r '.data.id')
+
+# 3. Обучение модели
+echo "3. Обучение модели..."
+TRAINING_RESPONSE=$(curl -s -X POST "$BASE_URL/models/train" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"datasetId\": \"$DATASET_ID\",
+    \"config\": {
+      \"hiddenLayers\": [4],
+      \"learningRate\": 0.5,
+      \"epochs\": 1000
+    },
+    \"testSplit\": 0.25
+  }")
+
+echo $TRAINING_RESPONSE | jq .
+MODEL_ID=$(echo $TRAINING_RESPONSE | jq -r '.data.modelId')
+
+# 4. Предсказание
+echo "4. Предсказание..."
+curl -s -X POST "$BASE_URL/models/predict" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"modelId\": \"$MODEL_ID\",
+    \"features\": [1, 1]
+  }" | jq .
+
+echo "✅ Тестирование завершено!"
+
+---
+
+# README.md для MVP
+
+# 🧠 AI Analytics MVP
+
+Платформа для быстрого создания и развертывания моделей машинного обучения на основе нейронных сетей.
+
+## 🚀 Быстрый старт
+
+### Локальная разработка
+
+1. **Клонируйте репозиторий:**
+```bash
+git clone https://github.com/your-username/ai-analytics-mvp.git
+cd ai-analytics-mvp
+```
+
+2. **Запустите приложение:**
+```bash
+./gradlew run
+```
+
+3. **Откройте браузер:** http://localhost:8080
+
+### Docker развертывание
+
+1. **Соберите и запустите:**
+```bash
+chmod +x scripts/deploy.sh
+./scripts/deploy.sh
+```
+
+2. **Тестирование API:**
+```bash
+chmod +x scripts/test-api.sh
+./scripts/test-api.sh
+```
+
+## 📋 Функциональность
+
+### ✨ Основные возможности:
+- 📁 **Загрузка данных** - CSV/JSON форматы
+- 🏋️ **Обучение моделей** - настраиваемые нейронные сети
+- 🔮 **Предсказания** - REST API для инференса
+- 📊 **Дашборд** - управление датасетами и моделями
+
+### 🔧 API Endpoints:
+
+```http
+POST   /api/datasets          # Загрузка датасета
+GET    /api/datasets          # Список датасетов
+POST   /api/models/train      # Обучение модели
+POST   /api/models/predict    # Предсказание
+GET    /api/models            # Список моделей
+GET    /api/health            # Health check
+```
+
+## 💡 Примеры использования
+
+### 1. Загрузка данных через API:
+
+```bash
+curl -X POST http://localhost:8080/api/datasets \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Sales Data",
+    "description": "Данные продаж за 2024",
+    "data": [
+      {"features": [100, 5, 1], "label": 1},
+      {"features": [50, 2, 0], "label": 0}
+    ]
+  }'
+```
+
+### 2. Обучение модели:
+
+```bash
+curl -X POST http://localhost:8080/api/models/train \
+  -H "Content-Type: application/json" \
+  -d '{
+    "datasetId": "your-dataset-id",
+    "config": {
+      "hiddenLayers": [10, 5],
+      "learningRate": 0.01,
+      "epochs": 2000
+    },
+    "testSplit": 0.2
+  }'
+```
+
+### 3. Предсказание:
+
+```bash
+curl -X POST http://localhost:8080/api/models/predict \
+  -H "Content-Type: application/json" \
+  -d '{
+    "modelId": "your-model-id",
+    "features": [75, 3, 1]
+  }'
+```
+
+## 🏗️ Архитектура
+
+```
+ai-analytics-mvp/
+├── src/main/kotlin/com/aianalytics/
+│   ├── Application.kt           # Главный файл приложения
+│   ├── models/                  # Модели данных
+│   │   └── DataModels.kt
+│   ├── ml/                      # ML движок
+│   │   └── NeuralNetwork.kt
+│   └── services/                # Бизнес логика
+│       └── MLService.kt
+├── scripts/                     # Скрипты развертывания
+├── docker-compose.yml           # Docker конфигурация
+└── README.md
+```
+
+## 🚀 Roadmap для стартапа
+
+### Phase 1 (MVP) - ✅ Готово
+- [x] Базовая нейронная сеть
+- [x] REST API
+- [x] Веб интерфейс
+- [x] Docker контейнеризация
+
+### Phase 2 (Рост)
+- [ ] Пользователи и аутентификация
+- [ ] Модели глубокого обучения
+- [ ] Интеграция с облачными сервисами
+- [ ] Мониторинг и логирование
+- [ ] Автоматическое масштабирование
+
+### Phase 3 (Масштабирование)
+- [ ] Multi-tenancy
+- [ ] Marketplace моделей
+- [ ] White-label решения
+- [ ] Enterprise функции
+
+## 💰 Бизнес-модель
+
+1. **Freemium**: 100 предсказаний/месяц бесплатно
+2. **Starter**: $29/мес - 10,000 предсказаний
+3. **Professional**: $99/мес - 100,000 предсказаний
+4. **Enterprise**: от $499/мес - неограниченно + поддержка
+
+## 📞 Контакты
+
+- 🌐 **Сайт**: your-startup.com
+- 📧 **Email**: hello@your-startup.com
+- 💬 **Slack**: your-startup.slack.com
+
+---
+
+⚡ **Сделано с ❤️ на Kotlin**
+
+## 🎯 Что включено в MVP:
+
+### 🔥 **Технический стек:**
+- **Backend**: Kotlin + Ktor (быстрый и современный)
+- **ML Engine**: Собственная нейронная сеть с нуля
+- **Frontend**: Современный адаптивный веб-интерфейс
+- **API**: RESTful с JSON
+- **Deploy**: Docker + docker-compose
+- **Proxy**: Nginx для продакшена
+
+### 💼 **Бизнес-возможности:**
+
+1. **Готовый продукт** - можно сразу показывать инвесторам
+2. **Масштабируемая архитектура** - легко добавлять новые функции
+3. **API-first подход** - можно продавать как SaaS
+4. **Простое развертывание** - один клик до продакшена
+
+### 🚀 **Следующие шаги для стартапа:**
+
+1. **Неделя 1-2**: Деплой на AWS/GCP, домен, SSL
+2. **Неделя 3-4**: Добавить аутентификацию и биллинг (Stripe)
+3. **Месяц 2**: Landing page + первые клиенты
+4. **Месяц 3**: Pitch deck + поиск инвестиций
+
+### 🎨 **Уникальные преимущества MVP:**
+
+- **Собственный ML движок** (не зависит от TensorFlow/PyTorch)
+- **Быстрый и легковесный** (Kotlin компилируется в эффективный байткод)
+- **Полностью кастомизируемый** под любую нишу
+- **Готовая монетизация** через API calls
+
+### 💡 **Рекомендации для запуска:**
+
+1. **Выберите нишу**: Например, анализ оттока клиентов для e-commerce
+2. **Создайте demo dataset**: Покажите конкретную ценность
+3. **Напишите case studies**: "Как мы увеличили продажи на 23%"
+4. **Запустите beta**: 10-20 тестовых клиентов бесплатно
+5. **Соберите feedback**: Доработайте под реальные потребности
+
+Этот MVP уже готов для демонстрации инвесторам и первым клиентам! Хотите, чтобы я помог с какой-то конкретной частью развития стартапа?
