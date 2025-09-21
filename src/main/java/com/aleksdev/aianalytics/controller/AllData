@@ -1,0 +1,629 @@
+// src/main/kotlin/com/aianalytics/controller/MLModelController.kt
+package com.aianalytics.controller
+
+import com.aianalytics.dto.*
+import com.aianalytics.entity.MLModel
+import com.aianalytics.service.MLModelService
+import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.tags.Tag
+import jakarta.validation.Valid
+import org.springframework.http.HttpStatus
+import org.springframework.http.ResponseEntity
+import org.springframework.web.bind.annotation.*
+import java.util.concurrent.CompletableFuture
+
+@RestController
+@RequestMapping("/api/models")
+@Tag(name = "ML Models", description = "API для управления моделями машинного обучения")
+class MLModelController(private val modelService: MLModelService) {
+
+    @PostMapping("/train")
+    @Operation(summary = "Обучить новую модель", description = "Запускает процесс обучения нейронной сети")
+    fun trainModel(@Valid @RequestBody request: TrainingRequest): ResponseEntity<ApiResponse<TrainingResponse>> {
+        val result = modelService.trainModel(request)
+        return ResponseEntity.status(HttpStatus.CREATED)
+            .body(ApiResponse(success = true, data = result))
+    }
+
+    @PostMapping("/train-async")
+    @Operation(summary = "Обучить модель асинхронно", description = "Запускает асинхронное обучение модели")
+    fun trainModelAsync(@Valid @RequestBody request: TrainingRequest): ResponseEntity<ApiResponse<String>> {
+        modelService.trainModelAsync(request)
+        return ResponseEntity.accepted()
+            .body(ApiResponse(success = true, data = "Training started asynchronously"))
+    }
+
+    @PostMapping("/predict")
+    @Operation(summary = "Сделать предсказание", description = "Использует обученную модель для предсказания")
+    fun predict(@Valid @RequestBody request: PredictionRequest): ResponseEntity<ApiResponse<PredictionResponse>> {
+        val result = modelService.predict(request)
+        return ResponseEntity.ok(ApiResponse(success = true, data = result))
+    }
+
+    @GetMapping
+    @Operation(summary = "Получить все модели")
+    fun getAllModels(): ResponseEntity<ApiResponse<List<MLModel>>> {
+        val models = modelService.getAllModels()
+        return ResponseEntity.ok(ApiResponse(success = true, data = models))
+    }
+
+    @GetMapping("/{id}")
+    @Operation(summary = "Получить модель по ID")
+    fun getModel(@PathVariable id: String): ResponseEntity<ApiResponse<MLModel>> {
+        val model = modelService.getModel(id)
+        return ResponseEntity.ok(ApiResponse(success = true, data = model))
+    }
+
+    @GetMapping("/by-dataset/{datasetId}")
+    @Operation(summary = "Получить модели по датасету")
+    fun getModelsByDataset(@PathVariable datasetId: String): ResponseEntity<ApiResponse<List<MLModel>>> {
+        val models = modelService.getModelsByDataset(datasetId)
+        return ResponseEntity.ok(ApiResponse(success = true, data = models))
+    }
+
+    @DeleteMapping("/{id}")
+    @Operation(summary = "Удалить модель")
+    fun deleteModel(@PathVariable id: String): ResponseEntity<ApiResponse<String>> {
+        modelService.deleteModel(id)
+        return ResponseEntity.ok(ApiResponse(success = true, data = "Model deleted successfully"))
+    }
+}
+
+// src/main/kotlin/com/aianalytics/controller/AnalyticsController.kt
+package com.aianalytics.controller
+
+import com.aianalytics.repository.DatasetRepository
+import com.aianalytics.repository.MLModelRepository
+import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.tags.Tag
+import org.springframework.http.ResponseEntity
+import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RestController
+import java.time.LocalDateTime
+
+@RestController
+@RequestMapping("/api/analytics")
+@Tag(name = "Analytics", description = "API для получения аналитики и статистики")
+class AnalyticsController(
+    private val datasetRepository: DatasetRepository,
+    private val modelRepository: MLModelRepository
+) {
+
+    @GetMapping("/dashboard")
+    @Operation(summary = "Получить данные для дашборда")
+    fun getDashboard(): ResponseEntity<Map<String, Any>> {
+        val since24h = LocalDateTime.now().minusDays(1)
+        val since7d = LocalDateTime.now().minusDays(7)
+
+        val dashboardData = mapOf(
+            "totalDatasets" to datasetRepository.count(),
+            "totalModels" to modelRepository.count(),
+            "datasetsLast24h" to datasetRepository.countCreatedSince(since24h),
+            "modelsLast24h" to modelRepository.countCreatedSince(since24h),
+            "datasetsLast7d" to datasetRepository.countCreatedSince(since7d),
+            "modelsLast7d" to modelRepository.countCreatedSince(since7d),
+            "recentDatasets" to datasetRepository.findTop10ByOrderByCreatedAtDesc(),
+            "topModels" to modelRepository.findTop10ByOrderByAccuracyDesc()
+        )
+
+        return ResponseEntity.ok(dashboardData)
+    }
+}
+
+// src/main/kotlin/com/aianalytics/controller/HealthController.kt
+package com.aianalytics.controller
+
+import org.springframework.boot.actuate.health.Health
+import org.springframework.boot.actuate.health.HealthIndicator
+import org.springframework.http.ResponseEntity
+import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RestController
+
+@RestController
+@RequestMapping("/api")
+class HealthController : HealthIndicator {
+
+    @GetMapping("/health")
+    fun healthCheck(): ResponseEntity<Map<String, Any>> {
+        val health = mapOf(
+            "status" to "UP",
+            "timestamp" to System.currentTimeMillis(),
+            "version" to "1.0.0",
+            "service" to "AI Analytics API"
+        )
+        return ResponseEntity.ok(health)
+    }
+
+    override fun health(): Health {
+        return Health.up()
+            .withDetail("service", "AI Analytics")
+            .withDetail("version", "1.0.0")
+            .build()
+    }
+}
+
+// src/main/kotlin/com/aianalytics/exception/GlobalExceptionHandler.kt
+package com.aianalytics.exception
+
+import com.aianalytics.dto.ApiResponse
+import org.springframework.http.HttpStatus
+import org.springframework.http.ResponseEntity
+import org.springframework.validation.FieldError
+import org.springframework.web.bind.MethodArgumentNotValidException
+import org.springframework.web.bind.annotation.ExceptionHandler
+import org.springframework.web.bind.annotation.RestControllerAdvice
+
+@RestControllerAdvice
+class GlobalExceptionHandler {
+
+    @ExceptionHandler(ResourceNotFoundException::class)
+    fun handleResourceNotFound(e: ResourceNotFoundException): ResponseEntity<ApiResponse<Nothing>> {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+            .body(ApiResponse(success = false, error = e.message))
+    }
+
+    @ExceptionHandler(IllegalArgumentException::class)
+    fun handleIllegalArgument(e: IllegalArgumentException): ResponseEntity<ApiResponse<Nothing>> {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+            .body(ApiResponse(success = false, error = e.message))
+    }
+
+    @ExceptionHandler(IllegalStateException::class)
+    fun handleIllegalState(e: IllegalStateException): ResponseEntity<ApiResponse<Nothing>> {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+            .body(ApiResponse(success = false, error = e.message))
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException::class)
+    fun handleValidationErrors(e: MethodArgumentNotValidException): ResponseEntity<ApiResponse<Nothing>> {
+        val errors = e.bindingResult.allErrors.joinToString("; ") { error ->
+            when (error) {
+                is FieldError -> "${error.field}: ${error.defaultMessage}"
+                else -> error.defaultMessage ?: "Validation error"
+            }
+        }
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+            .body(ApiResponse(success = false, error = "Validation failed: $errors"))
+    }
+
+    @ExceptionHandler(Exception::class)
+    fun handleGenericError(e: Exception): ResponseEntity<ApiResponse<Nothing>> {
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+            .body(ApiResponse(success = false, error = "Internal server error: ${e.message}"))
+    }
+}
+
+
+
+# src/main/resources/application.yml
+spring:
+  application:
+    name: ai-analytics
+
+  profiles:
+    active: dev
+
+  datasource:
+    url: jdbc:h2:mem:testdb
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+    default-property-inclusion: NON_NULL
+
+  cache:
+    type: simple
+
+  task:
+    execution:
+      pool:
+        core-size: 4
+        max-size: 16
+        queue-capacity: 100
+
+# Управление конечными точками
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when-authorized
+
+# Swagger/OpenAPI
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    tryItOutEnabled: true
+    operationsSorter: method
+    tagsSorter: alpha
+
+# Логирование
+logging:
+  level:
+    com.aianalytics: DEBUG
+    org.springframework.security: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+# Кастомные настройки
+aianalytics:
+  ml:
+    max-training-time: 300000 # 5 минут в миллисекундах
+    max-features: 1000
+    max-dataset-size: 100000
+  api:
+    rate-limit: 1000 # запросов в час
+
+---
+# Профиль разработки
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+  datasource:
+    url: jdbc:h2:mem:devdb
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+
+server:
+  port: 8080
+
+logging:
+  level:
+    root: INFO
+    com.aianalytics: DEBUG
+
+---
+# Профиль продакшена
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/aianalytics}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:password}
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+
+server:
+  port: ${PORT:8080}
+
+logging:
+  level:
+    root: WARN
+    com.aianalytics: INFO
+  file:
+    name: logs/ai-analytics.log
+
+---
+# Профиль тестирования
+spring:
+  config:
+    activate:
+      on-profile: test
+
+  datasource:
+    url: jdbc:h2:mem:testdb
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+
+# src/main/resources/data.sql
+-- Тестовые данные для разработки
+INSERT INTO datasets (id, name, description, data_json, feature_names, record_count, feature_count, created_at, updated_at) VALUES
+('550e8400-e29b-41d4-a716-446655440000', 'XOR Dataset', 'Классический XOR датасет для тестирования', '[{"features":[0,0],"label":0},{"features":[0,1],"label":1},{"features":[1,0],"label":1},{"features":[1,1],"label":0}]', 'input1,input2', 4, 2, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('550e8400-e29b-41d4-a716-446655440001', 'AND Dataset', 'Логическое И для тестирования', '[{"features":[0,0],"label":0},{"features":[0,1],"label":0},{"features":[1,0],"label":0},{"features":[1,1],"label":1}]', 'input1,input2', 4, 2, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+
+---
+
+# docker-compose.yml для Spring Boot
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: aianalytics
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - ai-network
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - ai-network
+
+  ai-analytics:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - DATABASE_URL=jdbc:postgresql://postgres:5432/aianalytics
+      - DB_USERNAME=postgres
+      - DB_PASSWORD=password123
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - ai-network
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/nginx/ssl
+    depends_on:
+      - ai-analytics
+    networks:
+      - ai-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+
+networks:
+  ai-network:
+    driver: bridge
+
+---
+
+# Dockerfile для Spring Boot
+FROM openjdk:17-jdk-slim
+
+# Создаем пользователя для безопасности
+RUN addgroup --system spring && adduser --system --group spring
+USER spring:spring
+
+WORKDIR /app
+
+# Копируем jar файл
+ARG JAR_FILE=build/libs/*.jar
+COPY ${JAR_FILE} app.jar
+
+# Настройки JVM для контейнера
+ENV JAVA_OPTS="-Xmx512m -Xms256m -XX:+UseG1GC -XX:+UseContainerSupport"
+
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8080/actuator/health || exit 1
+
+ENTRYPOINT exec java $JAVA_OPTS -jar app.jar
+
+---
+
+# Makefile для автоматизации
+.PHONY: build test run docker-build docker-run clean
+
+# Сборка проекта
+build:
+	./gradlew build
+
+# Запуск тестов
+test:
+	./gradlew test
+
+# Локальный запуск
+run:
+	./gradlew bootRun
+
+# Сборка Docker образа
+docker-build:
+	docker build -t ai-analytics:latest .
+
+# Запуск через Docker Compose
+docker-run:
+	docker-compose up -d
+
+# Остановка контейнеров
+docker-stop:
+	docker-compose down
+
+# Очистка
+clean:
+	./gradlew clean
+	docker system prune -f
+
+# Деплой в продакшен
+deploy: build docker-build
+	docker-compose -f docker-compose.prod.yml up -d
+
+# Просмотр логов
+logs:
+	docker-compose logs -f ai-analytics
+
+# Бэкап базы данных
+backup:
+	docker exec -t postgres pg_dumpall -c -U postgres > backup_$(shell date +%Y%m%d_%H%M%S).sql
+
+# Тестирование API
+test-api:
+	curl -f http://localhost:8080/api/health
+	curl -X POST http://localhost:8080/api/datasets \
+		-H "Content-Type: application/json" \
+		-d '{"name":"Test","description":"Test dataset","data":[{"features":[1,2],"label":1}]}'
+
+---
+
+# scripts/startup.sh - скрипт для инициализации
+#!/bin/bash
+
+echo "🚀 Запуск AI Analytics Platform..."
+
+# Проверка зависимостей
+if ! command -v docker &> /dev/null; then
+    echo "❌ Docker не установлен!"
+    exit 1
+fi
+
+if ! command -v java &> /dev/null; then
+    echo "❌ Java не установлен!"
+    exit 1
+fi
+
+# Создание необходимых директорий
+mkdir -p logs
+mkdir -p ssl
+
+# Генерация самоподписанного сертификата для тестирования
+if [ ! -f ssl/cert.pem ]; then
+    openssl req -x509 -newkey rsa:4096 -nodes \
+        -keyout ssl/key.pem -out ssl/cert.pem -days 365 \
+        -subj "/C=RU/ST=Moscow/L=Moscow/O=AI Analytics/CN=localhost"
+    echo "✅ SSL сертификат создан"
+fi
+
+# Сборка и запуск
+echo "📦 Сборка приложения..."
+./gradlew build
+
+echo "🐳 Запуск Docker контейнеров..."
+docker-compose up -d
+
+# Ожидание запуска сервисов
+echo "⏳ Ожидание запуска сервисов..."
+sleep 30
+
+# Проверка здоровья
+echo "🏥 Проверка состояния сервисов..."
+curl -f http://localhost:8080/actuator/health && echo "✅ API запущено" || echo "❌ API недоступно"
+
+echo "🌐 Приложение доступно:"
+echo "  - API: http://localhost:8080"
+echo "  - Swagger UI: http://localhost:8080/swagger-ui.html"
+echo "  - H2 Console: http://localhost:8080/h2-console"
+echo "  - Actuator: http://localhost:8080/actuator"
+
+---
+
+# scripts/test-complete.sh - полный тест системы
+#!/bin/bash
+
+BASE_URL="http://localhost:8080/api"
+
+echo "🧪 Полное тестирование AI Analytics API..."
+
+# 1. Health Check
+echo "1️⃣ Health Check..."
+curl -s "$BASE_URL/health" | jq .
+
+# 2. Создание датасета
+echo "2️⃣ Создание датасета..."
+DATASET_RESPONSE=$(curl -s -X POST "$BASE_URL/datasets" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Iris Dataset",
+    "description": "Классический датасет Ирисов для тестирования",
+    "data": [
+      {"features": [5.1, 3.5, 1.4, 0.2], "label": 0},
+      {"features": [4.9, 3.0, 1.4, 0.2], "label": 0},
+      {"features": [7.0, 3.2, 4.7, 1.4], "label": 1},
+      {"features": [6.4, 3.2, 4.5, 1.5], "label": 1},
+      {"features": [6.3, 3.3, 6.0, 2.5], "label": 2},
+      {"features": [5.8, 2.7, 5.1, 1.9], "label": 2}
+    ],
+    "featureNames": ["sepal_length", "sepal_width", "petal_length", "petal_width"]
+  }')
+
+echo $DATASET_RESPONSE | jq .
+DATASET_ID=$(echo $DATASET_RESPONSE | jq -r '.data.id')
+
+# 3. Получение всех датасетов
+echo "3️⃣ Получение списка датасетов..."
+curl -s "$BASE_URL/datasets" | jq .
+
+# 4. Обучение модели
+echo "4️⃣ Обучение модели..."
+TRAINING_RESPONSE=$(curl -s -X POST "$BASE_URL/models/train" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"datasetId\": \"$DATASET_ID\",
+    \"config\": {
+      \"hiddenLayers\": [8, 4],
+      \"learningRate\": 0.01,
+      \"epochs\": 2000
+    },
+    \"testSplit\": 0.3
+  }")
+
+echo $TRAINING_RESPONSE | jq .
+MODEL_ID=$(echo $TRAINING_RESPONSE | jq -r '.data.modelId')
+
+# 5. Получение информации о модели
+echo "5️⃣ Информация о модели..."
+curl -s "$BASE_URL/models/$MODEL_ID" | jq .
+
+# 6. Предсказания
+echo "6️⃣ Тестирование предсказаний..."
+
+# Тест 1: Iris Setosa
+curl -s -X POST "$BASE_URL/models/predict" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"modelId\": \"$MODEL_ID\",
+    \"features\": [5.0, 3.5, 1.3, 0.3]
+  }" | jq .
+
+# Тест 2: Iris Versicolor
+curl -s -X POST "$BASE_URL/models/predict" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"modelId\": \"$MODEL_ID\",
+    \"features\": [6.0, 3.0, 4.5, 1.5]
+  }" | jq .
+
+# 7. Аналитика
+echo "7️⃣ Дашборд аналитики..."
+curl -s "$BASE_URL/analytics/dashboard" | jq .
+
+# 8. Метрики системы
+echo "8️⃣ Системные метрики..."
+curl -s "http://localhost:8080/actuator/metrics" | jq '.names | sort'
+
+echo "✅ Тестирование завершено успешно!"
