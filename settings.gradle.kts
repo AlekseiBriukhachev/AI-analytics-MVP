@@ -1,4 +1,4 @@
-rootProject.name = "AI-analitics-MVP"
+rootProject.name = "AI-analytics-MVP"
 pluginManagement {
     repositories {
         gradlePluginPortal()
