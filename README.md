@@ -1,63 +1,63 @@
 # 🧠 AI Analytics Platform - Spring Boot MVP
 
-Профессиональная платформа для создания и развертывания моделей машинного обучения на базе Spring Boot и собственного ML движка.
+A professional platform for creating and deploying machine learning models based on Spring Boot and a custom ML engine.
 
-## 🚀 Быстрый старт
+## 🚀 Quick Start
 
-### Предварительные требования
+### Prerequisites
 - Java 17+
 - Docker & Docker Compose
 - Git
 
-### Локальная разработка
+### Local Development
 
 ```bash
-# Клонирование репозитория
+# Clone the repository
 git clone https://github.com/your-username/ai-analytics-platform.git
 cd ai-analytics-platform
 
-# Запуск в режиме разработки
+# Run in development mode
 ./gradlew bootRun
 
-# Или через Make
+# Or via Make
 make run
 ```
 
-### Docker развертывание
+### Docker Deployment
 
 ```bash
-# Быстрый старт
+# Quick start
 chmod +x scripts/startup.sh
 ./scripts/startup.sh
 
-# Или вручную
+# Or manually
 docker-compose up -d
 ```
 
-## 📋 Функциональность
+## 📋 Features
 
-### ✨ Основные возможности
+### ✨ Main Capabilities
 
-#### 🔧 Платформа
-- **REST API** с OpenAPI/Swagger документацией
-- **Современный веб-интерфейс** на React
-- **Реляционная БД** с JPA/Hibernate
-- **Кэширование** для высокой производительности
-- **Мониторинг** через Spring Boot Actuator
+#### 🔧 Platform
+- **REST API** with OpenAPI/Swagger documentation
+- **Modern web interface** built with React
+- **Relational DB** using JPA/Hibernate
+- **Caching** for high performance
+- **Monitoring** via Spring Boot Actuator
 
-#### 🤖 Машинное обучение
-- **Собственный ML движок** на чистом Kotlin
-- **Нейронные сети** с настраиваемой архитектурой
-- **Обучение и предсказания** через REST API
-- **Метрики качества** модели
+#### 🤖 Machine Learning
+- **Custom ML engine** written in pure Kotlin
+- **Neural networks** with configurable architecture
+- **Training and prediction** via REST API
+- **Model quality metrics**
 
-#### 📊 Управление данными
-- **Загрузка датасетов** (CSV/JSON)
-- **Валидация данных** с подробными ошибками
-- **Версионирование** датасетов
-- **Аналитика** использования
+#### 📊 Data Management
+- **Dataset upload** (CSV/JSON)
+- **Data validation** with detailed errors
+- **Dataset versioning**
+- **Usage analytics**
 
-## 🏗️ Архитектура
+## 🏗️ Architecture
 
 ```
 ┌─────────────────────────────────────────────┐
@@ -67,7 +67,7 @@ docker-compose up -d
                   │ HTTP/REST
 ┌─────────────────▼───────────────────────────┐
 │              Spring Boot                    │
-│  ┌─────────────┐  ┌─────────────────────┐   │
+│  ┌───────────┐  ┌─────────────────────┐   │
 │  │ Controllers │  │     Services        │   │
 │  └─────────────┘  └─────────────────────┘   │
 │  ┌─────────────┐  ┌─────────────────────┐   │
@@ -83,42 +83,42 @@ docker-compose up -d
 
 ## 📡 API Reference
 
-### Базовый URL: `/api`
+### Base URL: `/api`
 
-#### Датасеты
+#### Datasets
 ```http
-POST   /datasets              # Создать датасет
-GET    /datasets              # Список датасетов (с пагинацией)
-GET    /datasets/{id}         # Получить датасет
-GET    /datasets/{id}/data    # Получить данные
-DELETE /datasets/{id}         # Удалить датасет
+POST   /datasets              # Create dataset
+GET    /datasets              # List datasets (with pagination)
+GET    /datasets/{id}         # Get dataset
+GET    /datasets/{id}/data    # Get data
+DELETE /datasets/{id}         # Delete dataset
 ```
 
-#### Модели
+#### Models
 ```http
-POST   /models/train          # Обучить модель
-POST   /models/train-async    # Асинхронное обучение
-POST   /models/predict        # Предсказание
-GET    /models               # Список моделей
-GET    /models/{id}          # Информация о модели
-DELETE /models/{id}          # Удалить модель
+POST   /models/train          # Train model
+POST   /models/train-async    # Train asynchronously
+POST   /models/predict        # Prediction
+GET    /models                # List models
+GET    /models/{id}           # Model info
+DELETE /models/{id}           # Delete model
 ```
 
-#### Аналитика
+#### Analytics
 ```http
-GET    /analytics/dashboard   # Дашборд метрик
+GET    /analytics/dashboard   # Metrics dashboard
 GET    /health                # Health check
 ```
 
-### Примеры запросов
+### Request Examples
 
-#### Создание датасета
+#### Create Dataset
 ```bash
 curl -X POST http://localhost:8080/api/datasets \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Sales Analytics",
-    "description": "Данные продаж за Q4 2024",
+    "description": "Sales data for Q4 2024",
     "data": [
       {"features": [1000, 5, 1], "label": 1},
       {"features": [500, 2, 0], "label": 0}
@@ -127,7 +127,7 @@ curl -X POST http://localhost:8080/api/datasets \
   }'
 ```
 
-#### Обучение модели
+#### Train Model
 ```bash
 curl -X POST http://localhost:8080/api/models/train \
   -H "Content-Type: application/json" \
@@ -142,7 +142,7 @@ curl -X POST http://localhost:8080/api/models/train \
   }'
 ```
 
-#### Предсказание
+#### Prediction
 ```bash
 curl -X POST http://localhost:8080/api/models/predict \
   -H "Content-Type: application/json" \
@@ -152,9 +152,9 @@ curl -X POST http://localhost:8080/api/models/predict \
   }'
 ```
 
-## 🔧 Конфигурация
+## 🔧 Configuration
 
-### Профили Spring Boot
+### Spring Boot Profiles
 
 #### Development (`dev`)
 ```yaml
@@ -182,134 +182,134 @@ server:
   port: ${PORT:8080}
 ```
 
-### Переменные окружения
+### Environment Variables
 
 ```bash
-# База данных
+# Database
 DATABASE_URL=jdbc:postgresql://localhost:5432/aianalytics
 DB_USERNAME=postgres
 DB_PASSWORD=your_password
 
-# Приложение
+# Application
 SPRING_PROFILES_ACTIVE=prod
 PORT=8080
 
-# Опциональные
+# Optional
 REDIS_URL=redis://localhost:6379
 LOG_LEVEL=INFO
 ```
 
-## 🧪 Тестирование
+## 🧪 Testing
 
-### Запуск тестов
+### Run Tests
 ```bash
-# Все тесты
+# All tests
 ./gradlew test
 
-# Только unit тесты
+# Only unit tests
 ./gradlew test --tests "*UnitTest"
 
-# Интеграционные тесты
+# Integration tests
 ./gradlew test --tests "*IntegrationTest"
 ```
 
-### API тестирование
+### API Testing
 ```bash
-# Полный тест системы
+# Full system test
 chmod +x scripts/test-complete.sh
 ./scripts/test-complete.sh
 
-# Простая проверка
+# Simple check
 make test-api
 ```
 
-## 📊 Мониторинг и метрики
+## 📊 Monitoring and Metrics
 
-### Доступные endpoints
+### Available Endpoints
 - **Health**: `/actuator/health`
 - **Metrics**: `/actuator/metrics`
 - **Info**: `/actuator/info`
 - **Prometheus**: `/actuator/prometheus`
 
 ### Swagger UI
-- **Документация API**: `http://localhost:8080/swagger-ui.html`
+- **API Documentation**: `http://localhost:8080/swagger-ui.html`
 - **OpenAPI JSON**: `http://localhost:8080/v3/api-docs`
 
-### Логирование
+### Logging
 ```bash
-# Просмотр логов в Docker
+# View logs in Docker
 docker-compose logs -f ai-analytics
 
-# Логи приложения
+# Application logs
 tail -f logs/ai-analytics.log
 ```
 
-## 🚀 Деплой в продакшн
+## 🚀 Production Deployment
 
-### Docker Compose (рекомендуется)
+### Docker Compose (recommended)
 ```bash
-# Создание продакшн конфигурации
+# Create production configuration
 cp docker-compose.yml docker-compose.prod.yml
 
-# Редактирование переменных
+# Edit variables
 vim docker-compose.prod.yml
 
-# Деплой
+# Deploy
 docker-compose -f docker-compose.prod.yml up -d
 ```
 
-### Cloud платформы
+### Cloud Platforms
 
 #### Heroku
 ```bash
-# Установка Heroku CLI
+# Install Heroku CLI
 heroku create ai-analytics-platform
 
-# Настройка переменных
+# Set variables
 heroku config:set SPRING_PROFILES_ACTIVE=prod
 heroku config:set DATABASE_URL=your_postgres_url
 
-# Деплой
+# Deploy
 git push heroku main
 ```
 
 #### AWS ECS
 ```bash
-# Сборка образа
+# Build image
 docker build -t ai-analytics .
 
-# Тегирование для ECR
+# Tag for ECR
 docker tag ai-analytics:latest 123456789.dkr.ecr.region.amazonaws.com/ai-analytics:latest
 
-# Push в ECR
+# Push to ECR
 docker push 123456789.dkr.ecr.region.amazonaws.com/ai-analytics:latest
 ```
 
-## 💰 Бизнес-модель и монетизация
+## 💰 Business Model and Monetization
 
-### Тарифные планы
+### Pricing Plans
 
-#### 🆓 Starter (Бесплатный)
-- 100 предсказаний/месяц
-- 1 датасет
-- 1 модель
-- Базовая поддержка
+#### 🆓 Starter (Free)
+- 100 predictions/month
+- 1 dataset
+- 1 model
+- Basic support
 
-#### 💼 Professional ($99/мес)
-- 10,000 предсказаний/месяц
-- Неограниченное количество датасетов
-- 10 моделей
-- Приоритетная поддержка
-- API ключи
+#### 💼 Professional ($99/mo)
+- 10,000 predictions/month
+- Unlimited datasets
+- 10 models
+- Priority support
+- API keys
 
-#### 🏢 Enterprise ($499/мес)
-- Неограниченные предсказания
-- Белый лейбл
+#### 🏢 Enterprise ($499/mo)
+- Unlimited predictions
+- White label
 - Dedicated support
 - SLA 99.9%
-- Custom интеграции
+- Custom integrations
 
-### Реализация биллинга
+### Billing Implementation
 ```kotlin
 @Entity
 class Subscription(
@@ -322,89 +322,89 @@ class Subscription(
 @Component
 class BillingService {
     fun checkUsageLimit(userId: String): Boolean {
-        // Проверка лимитов пользователя
+        // Check user limits
     }
     
     fun trackApiCall(userId: String) {
-        // Учет вызовов API
+        // Track API calls
     }
 }
 ```
 
-## 📈 Roadmap развития
+## 📈 Development Roadmap
 
-### Phase 1: MVP (✅ Готово)
-- [x] Базовая нейронная сеть
-- [x] REST API с валидацией
-- [x] Современный UI
-- [x] Docker контейнеризация
-- [x] Документация API
+### Phase 1: MVP (✅ Done)
+- [x] Basic neural network
+- [x] REST API with validation
+- [x] Modern UI
+- [x] Docker containerization
+- [x] API documentation
 
-### Phase 2: Growth (3 месяца)
-- [ ] Аутентификация JWT
-- [ ] Stripe интеграция для платежей
-- [ ] Rate limiting по тарифам
-- [ ] Email уведомления
-- [ ] Глубокие нейронные сети
+### Phase 2: Growth (3 months)
+- [ ] JWT authentication
+- [ ] Stripe integration for payments
+- [ ] Rate limiting by plan
+- [ ] Email notifications
+- [ ] Deep neural networks
 
-### Phase 3: Scale (6 месяцев)
-- [ ] Microservices архитектура
+### Phase 3: Scale (6 months)
+- [ ] Microservices architecture
 - [ ] Kubernetes deployment
-- [ ] ML Pipeline с MLOps
-- [ ] Batch предсказания
+- [ ] ML Pipeline with MLOps
+- [ ] Batch predictions
 - [ ] Auto-scaling
 
-### Phase 4: Enterprise (12 месяцев)
+### Phase 4: Enterprise (12 months)
 - [ ] Multi-tenancy
-- [ ] SSO интеграция
+- [ ] SSO integration
 - [ ] Audit logs
-- [ ] Custom ML алгоритмы
-- [ ] White-label решения
+- [ ] Custom ML algorithms
+- [ ] White-label solutions
 
-## 👥 Команда и контрибьюторы
+## 👥 Team and Contributors
 
-### Основатели
-- **CTO**: Разработка ML движка и архитектуры
-- **CEO**: Бизнес-развитие и продажи
-- **Lead Developer**: Full-stack разработка
+### Founders
+- **CTO**: ML engine and architecture development
+- **CEO**: Business development and sales
+- **Lead Developer**: Full-stack development
 
-### Как контрибьютить
-1. Fork репозиторий
-2. Создайте feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit изменения (`git commit -m 'Add amazing feature'`)
-4. Push в branch (`git push origin feature/amazing-feature`)
-5. Создайте Pull Request
+### How to Contribute
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit changes (`git commit -m 'Add amazing feature'`)
+4. Push to branch (`git push origin feature/amazing-feature`)
+5. Create a Pull Request
 
-### Кодстайл
+### Code Style
 - Kotlin coding conventions
-- 100% test coverage для бизнес-логики
-- Документация для всех public API
+- 100% test coverage for business logic
+- Documentation for all public APIs
 - Semantic commit messages
 
-## 📞 Поддержка и контакты
+## 📞 Support and Contacts
 
-### Техническая поддержка
+### Technical Support
 - 📧 **Email**: support@aianalytics.platform
 - 💬 **Slack**: [aianalytics.slack.com](https://aianalytics.slack.com)
 - 📖 **Docs**: [docs.aianalytics.platform](https://docs.aianalytics.platform)
 
-### Бизнес-запросы
+### Business Inquiries
 - 📧 **Sales**: sales@aianalytics.platform
-- 📞 **Телефон**: +7 (XXX) XXX-XX-XX
-- 🌐 **Сайт**: [aianalytics.platform](https://aianalytics.platform)
+- 📞 **Phone**: +7 (XXX) XXX-XX-XX
+- 🌐 **Website**: [aianalytics.platform](https://aianalytics.platform)
 
-## 📄 Лицензия
+## 📄 License
 
-Этот проект лицензирован под MIT License - см. файл [LICENSE](LICENSE) для деталей.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🙏 Благодарности
+## 🙏 Acknowledgements
 
-- Spring Boot team за отличный фреймворк
-- Kotlin team за современный язык
-- Open source community за вдохновение
+- Spring Boot team for an excellent framework
+- Kotlin team for a modern language
+- Open source community for inspiration
 
 ---
 
-**Сделано с ❤️ и ☕ командой AI Analytics Platform**
+**Made with ❤️ and ☕ by the AI Analytics Platform team**
 
-> 💡 **Tip**: Это MVP готов для демонстрации инвесторам и первым клиентам. Следующий шаг - привлечение seed раунда $500K-$1M для масштабирования команды и продукта.
+> 💡 **Tip**: This MVP is ready for demonstration to investors and first clients. The next step is to raise a seed round of $500K-$1M to scale the team and product.
