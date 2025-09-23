@@ -12,7 +12,7 @@ import java.time.LocalDateTime
 interface DatasetRepository : JpaRepository<Dataset, String> {
     fun findByNameContainingIgnoreCase(name: String, pageable: Pageable): Page<Dataset>
 
-    @Query("SELECT COUNT(d) FROM d WHERE d.createdAt >= :since")
+    @Query("SELECT COUNT(d) FROM Dataset d WHERE d.createdAt >= :since")
     fun countCreatedSince(since: LocalDateTime): Long
 
     fun findTop10ByOrderByCreatedAtDesc(): List<Dataset>

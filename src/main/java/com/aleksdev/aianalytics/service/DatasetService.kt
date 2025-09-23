@@ -71,17 +71,17 @@ class DatasetService(
     }
 
     private fun validateDataset(request: DatasetCreateRequest) {
-        if (request.data.isEmpty()) {
+        require (request.data.isNotEmpty()) {
             throw  IllegalArgumentException("Dataset cannot be empty")
         }
 
         val featureCount = request.data.first().features.size
-        if (featureCount == 0) {
+        require (featureCount != 0) {
             throw IllegalArgumentException("Features cannot be empty")
         }
 
         request.data.forEach { point ->
-            if (point.features.size != featureCount) {
+            require (point.features.size != featureCount) {
                 throw IllegalArgumentException("Inconsistent feature count across data points")
             }
         }
@@ -89,7 +89,7 @@ class DatasetService(
         val hasLabels = request.data.all { it.label != null }
         val hasNotLabels = request.data.all { it.label == null }
 
-        if (!hasLabels && !hasNotLabels) {
+        require (!(!hasLabels && !hasNotLabels)) {
             throw IllegalArgumentException("Either all data points must have labels or none")
         }
     }

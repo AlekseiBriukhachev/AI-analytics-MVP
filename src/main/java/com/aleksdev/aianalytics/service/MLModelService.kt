@@ -37,15 +37,15 @@ class MLModelService(
         val dataPoints = datasetService.getDatasetData(request.datasetId)
 
         // Checking for labels
-        if (dataPoints.any { it.label == null }) {
+        require (!(dataPoints.any { it.label == null })) {
             throw IllegalArgumentException("All data points must have labels for supervised learning")
         }
 
         // Prepare dates
         val shuffledData = dataPoints.shuffled()
         val splitIndex = (shuffledData.size * (1 - request.testSplit)).toInt()
-        val trainData = shuffledData.take(splitIndex).map { it.features to it.label }
-        val testData = shuffledData.drop(splitIndex).map { it.features to it.label }
+        val trainData = shuffledData.take(splitIndex).map { it.features to (it.label ?: 0.0) }
+        val testData = shuffledData.drop(splitIndex).map { it.features to (it.label ?: 0.0) }
 
         // Create the network architecture
         val inputSize = dataPoints.first().features.size
@@ -106,7 +106,7 @@ class MLModelService(
     fun predict(request: PredictionRequest): PredictionResponse {
         val model = getModel(request.modelId)
 
-        if (model.status != ModelStatus.TRAINED) {
+        require (model.status == ModelStatus.TRAINED) {
             throw IllegalArgumentException("Model is not trained yet: ${request.modelId}")
         }
 

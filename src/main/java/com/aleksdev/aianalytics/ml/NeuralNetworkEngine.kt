@@ -12,9 +12,8 @@ class NeuralNetworkEngine {
 
     fun createAndTrain(
         layers: List<Int>,
-        // TODO remove safe operator
-        trainData: List<Pair<List<Double>, Double?>>,
-        testData: List<Pair<List<Double>, Double?>>,
+        trainData: List<Pair<List<Double>, Double>>,
+        testData: List<Pair<List<Double>, Double>>,
         learningRate: Double,
         epochs: Int
     ): TrainingResult {
