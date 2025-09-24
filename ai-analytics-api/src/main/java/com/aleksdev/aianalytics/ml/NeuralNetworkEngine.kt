@@ -1,6 +1,8 @@
 package com.aleksdev.aianalytics.ml
 
-import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.annotation.JsonProperty
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.fasterxml.jackson.module.kotlin.readValue
 import org.springframework.stereotype.Component
 import java.util.*
 import kotlin.math.exp
@@ -8,7 +10,7 @@ import kotlin.math.sqrt
 
 @Component
 class NeuralNetworkEngine {
-    private val objectMapper = ObjectMapper()
+    private val objectMapper = jacksonObjectMapper()
 
     fun createAndTrain(
         layers: List<Int>,
@@ -66,7 +68,7 @@ class NeuralNetworkEngine {
     }
 
     private fun deserializeWeights(network: NeuralNetwork, weightsJson: String) {
-        val weights = objectMapper.readValue(weightsJson, NetworkWeights::class.java)
+        val weights = objectMapper.readValue<NetworkWeights>(weightsJson)
         network.setWeights(weights)
     }
 }

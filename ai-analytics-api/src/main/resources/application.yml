@@ -54,7 +54,7 @@ springdoc:
   api-docs:
     path: /v3/api-docs
   swagger-ui:
-    path: /swagger-ui.html
+    path: /index.html
     try-it-out-enabled: true
     operations-sorter: method
     tags-sorter: alpha
@@ -64,6 +64,8 @@ logging:
   level:
     com.aleksdev.aianalytics: DEBUG
     org.springframework.security: DEBUG
+    org.springframework.web: DEBUG
+    org.springframework.boot.autoconfigure.security: DEBUG
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
     file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"

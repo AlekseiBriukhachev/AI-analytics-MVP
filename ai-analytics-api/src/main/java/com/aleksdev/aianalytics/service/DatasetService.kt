@@ -81,7 +81,7 @@ class DatasetService(
         }
 
         request.data.forEach { point ->
-            require (point.features.size != featureCount) {
+            require (point.features.size == featureCount) {
                 throw IllegalArgumentException("Inconsistent feature count across data points")
             }
         }

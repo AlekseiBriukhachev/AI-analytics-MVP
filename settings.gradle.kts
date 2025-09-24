@@ -15,4 +15,4 @@ dependencyResolutionManagement {
 }
 
 
-include("backend")
+include("ai-analytics-api")

@@ -8,17 +8,17 @@ import jakarta.validation.constraints.Size
 data class DatasetCreateRequest(
     @field:NotBlank(message = "The title cannot be empty")
     @field:Size(max = 255, message = "The title cannot be longer than 255 characters")
-    @Schema(description = "Dataset title", example = "Sales data")
+    @field:Schema(description = "Dataset title", example = "Sales data")
     val name: String,
 
     @field:Size(max = 1000, message = "The description cannot be longer than 1000 characters")
-    @Schema(description = "Dataset description", example = "2025 historical sales data")
+    @field:Schema(description = "Dataset description", example = "2025 historical sales data")
     val description: String? = null,
 
     @field:NotEmpty(message = "Data cannot be empty")
-    @Schema(description = "Array of data points")
+    @field:Schema(description = "Array of data points")
     val data: List<DataPoint>,
 
-    @Schema(description = "Feature names", example = "[\"price\", \"quantity\", \"category\"]")
+    @field:Schema(description = "Feature names", example = "[\"price\", \"quantity\", \"category\"]")
     val featureNames: List<String> = emptyList()
 )
