@@ -11,7 +11,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      - /src/resources/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     networks:
       - ai-network
 
@@ -45,17 +45,17 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf
-      - ./ssl:/etc/nginx/ssl
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
     depends_on:
       - ai-analytics
     networks:
       - ai-network
-    restart: unless-stopped
+    restart: always
 
 volumes:
   postgres_data:
 
 networks:
-    ai-network:
-        driver: bridge
+  ai-network:
+    driver: bridge
