@@ -1,4 +1,5 @@
 import DatasetManager from "./DatasetManager";
+import ModelManager from "./ModelManager";
 
 function MainContent({ onRefresh }) {
     return (
