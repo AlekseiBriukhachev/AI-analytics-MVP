@@ -28,15 +28,15 @@ function ModelList({ models, onRefresh }) {
                             {getStatusIcon(model.status)} Model {model.id.substring(0, 8)}...
                         </h4>
                         <div className="model-meta">
-                                <span style={{color: getStatusColor(model.status)}}>
-                                    📊 {model.status}
-                                </span>
+                            <span style={{ color: getStatusColor(model.status) }}>
+                                📊 {model.status}
+                            </span>
                             {model.accuracy > 0 && (
                                 <span>🎯 {(model.accuracy * 100).toFixed(1)}% accuracy</span>
                             )}
                             <span>⚡ {model.epochs} epoch</span>
-                            <span>⏱️ {model.trainingTime}ms</span>
-                            <span>📅 {new Date(model.createdAt).toLocaleDateString()}</span>
+                            <span>⏱️ {model.training_time}ms</span>
+                            <span>📅 {new Date(model.created_at).toLocaleDateString()}</span>
                         </div>
                     </div>
                 ))
@@ -44,3 +44,5 @@ function ModelList({ models, onRefresh }) {
         </div>
     );
 }
+
+export default ModelList;

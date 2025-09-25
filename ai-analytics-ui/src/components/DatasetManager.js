@@ -1,8 +1,8 @@
 import DatasetUpload from "./DatasetUpload";
 import DatasetList from "./DatasetList";
-import {useCallback, useEffect, useState} from "react";
+import { useCallback, useEffect, useState } from "react";
 
-function DatasetManager({onRefresh}) {
+function DatasetManager({ onRefresh }) {
 
     const [activeTab, setActiveTab] = useState('upload');
     const [datasets, setDatasets] = useState([]);
@@ -11,9 +11,9 @@ function DatasetManager({onRefresh}) {
 
     const loadDatasets = useCallback(async () => {
         try {
-            const response = await fetch('/api/datasets');
+            const response = await fetch('http://localhost:8080/api/datasets');
             const data = await response.json();
-            setDatasets(data?.content || []);
+            setDatasets(data?.data.content || []);
             setError(null);
         } catch (err) {
             console.error('Failed to load datasets:', err);

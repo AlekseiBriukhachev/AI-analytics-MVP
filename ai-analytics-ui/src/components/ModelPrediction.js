@@ -1,6 +1,6 @@
-import {useState} from 'react';
+import { useState } from 'react';
 
-function ModelPrediction({models}) {
+function ModelPrediction({ models }) {
     const [formData, setFormData] = useState({
         modelId: '',
         features: ''
@@ -16,18 +16,18 @@ function ModelPrediction({models}) {
         try {
             const payload = {
                 modelId: formData.modelId,
-                features: formData.features.split(',').map(x => parseFloat(x.trim()))
+                features: formData.features.split(', ').map(x => parseFloat(x.trim()))
             };
 
-            const response = await fetch('/api/models/predict', {
+            const response = await fetch('http://localhost:8080/api/models/predict', {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json'},
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
             const data = await response.json();
             setResult({
-                type: 'success',
-                message: 'Prediction successful!',
+                type: response.ok ? 'success' : 'error',
+                message: response.ok ? 'Prediction successful!' : (data.error || 'Prediction failed.'),
                 details: data.data
             });
         } catch (err) {
@@ -42,67 +42,73 @@ function ModelPrediction({models}) {
     };
 
     return (
-        <form onSubmit={handleSubmit}>
-            <div className="form-group">
-                <label>Model *</label>
-                <select
-                    className="form-control"
-                    value={formData.modelId}
-                    onChange={(e) => setFormData({...formData, modelId: e.target.value})}
-                    required
-                >
-                    <option value="">Choose the model</option>
-                    {models.filter(m => m.status === 'TRAINED').map(model => (
-                        <option key={model.id} value={model.id}>
-                            Model {model.id.substring(0, 8)}... (accuracy: {(model.accuracy * 100).toFixed(1)}%)
-                        </option>
-                    ))}
-                </select>
-            </div>
-
-            <div className="form-group">
-                <label>Input data (separated by comma) *</label>
-                <input
-                    type="text"
-                    className="form-control"
-                    value={formData.features}
-                    onChange={(e) => setFormData({...formData, features: e.target.value})}
-                    required
-                    placeholder="1.0,2.0,3.0"
-                />
-            </div>
-
-            <button type="submit" className="btn" disabled={loading || !formData.modelId}>
-                {loading ? (
-                    <div className="loading">
-                        <div className="spinner"></div>
-                        <span>We predict...</span>
+        <div>
+            {models == null || models.length <= 0 ? (
+                <p>No trained models available for prediction.</p>
+            ) : (
+                <form onSubmit={handleSubmit}>
+                    <div className="form-group">
+                        <label>Model *</label>
+                        <select
+                            className="form-control"
+                            value={formData.modelId}
+                            onChange={(e) => setFormData({ ...formData, modelId: e.target.value })}
+                            required
+                        >
+                            <option value="">Choose the model</option>
+                            {models.filter(m => m.status === 'TRAINED').map(model => (
+                                <option key={model.id} value={model.id}>
+                                    Model {model.id.substring(0, 8)}... (accuracy: {(model.accuracy * 100).toFixed(1)}%)
+                                </option>
+                            ))}
+                        </select>
                     </div>
-                ) : '🎯 Make a prediction'}
-            </button>
 
-            {result && (
-                <div className={`alert alert-${result.type}`}>
-                    {result.message}
-                    {result.data && (
-                        <div className="metrics-grid">
-                            <div className="metric">
-                                <div className="metric-value">{result.data.prediction.toFixed(4)}</div>
-                                <div className="metric-label">Prediction</div>
+                    <div className="form-group">
+                        <label>Input data (separated by comma) *</label>
+                        <input
+                            type="text"
+                            className="form-control"
+                            value={formData.features}
+                            onChange={(e) => setFormData({ ...formData, features: e.target.value })}
+                            required
+                            placeholder="Example: 1.0, 2.0, 3.0"
+                        />
+                    </div>
+
+                    <button type="submit" className="btn" disabled={loading || !formData.modelId}>
+                        {loading ? (
+                            <div className="loading">
+                                <div className="spinner"></div>
+                                <span>We predict...</span>
                             </div>
-                            <div className="metric">
-                                <div className="metric-value">{(result.data.confidence * 100).toFixed(1)}%</div>
-                                <div className="metric-label">Confidence</div>
-                            </div>
-                            <div className="metric">
-                                <div className="metric-value">{result.data.predictedClass}</div>
-                                <div className="metric-label">Class</div>
-                            </div>
+                        ) : '🎯 Make a prediction'}
+                    </button>
+
+                    {result && (
+                        <div className={`alert alert-${result.type}`}>
+                            {result.message}
+                            {result.data && (
+                                <div className="metrics-grid">
+                                    <div className="metric">
+                                        <div className="metric-value">{result.data.prediction.toFixed(4)}</div>
+                                        <div className="metric-label">Prediction</div>
+                                    </div>
+                                    <div className="metric">
+                                        <div className="metric-value">{(result.data.confidence * 100).toFixed(1)}%</div>
+                                        <div className="metric-label">Confidence</div>
+                                    </div>
+                                    <div className="metric">
+                                        <div className="metric-value">{result.data.predictedClass}</div>
+                                        <div className="metric-label">Class</div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
-                </div>
+                </form>
             )}
-        </form>
+        </div>
     );
 }
 

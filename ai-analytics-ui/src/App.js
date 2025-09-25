@@ -24,25 +24,25 @@ function App() {
         }
     }, []);
 
-    useEffect(() => {
-        loadDashboard();
-        const interval = setInterval(loadDashboard, 30000); // Refresh every 30 seconds
-        return () => clearInterval(interval);
-    }, [loadDashboard]);
+    // useEffect(() => {
+    //     loadDashboard();
+    //     const interval = setInterval(loadDashboard, 30000); // Refresh every 30 seconds
+    //     return () => clearInterval(interval);
+    // }, [loadDashboard]);
 
-    if (loading &&!dashboard) {
-        return (
-            <div className="app-container">
-                <div className="loading">
-                    <span>Platform loading...</span>
-                </div>
-            </div>
-        );
-    }
+    // if (loading && !dashboard) {
+    //     return (
+    //         <div className="app-container">
+    //             <div className="loading">
+    //                 <span>Platform loading...</span>
+    //             </div>
+    //         </div>
+    //     );
+    // }
 
     return (
         <div className="app-container fade-in">
-            <Header/>
+            <Header />
             {error && (
                 <div className="alert alert-error">
                     <span>Loading error: {error}</span>

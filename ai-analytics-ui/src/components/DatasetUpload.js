@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-function DatasetUpload({onSuccess}) {
+function DatasetUpload({ onSuccess }) {
     const [formData, setFormData] = useState({
         name: '',
         description: '',
@@ -26,14 +26,16 @@ function DatasetUpload({onSuccess}) {
                 name: formData.name,
                 description: formData.description || null,
                 data: data,
-                featureNames: formData.featureNames ? formData.featureNames.split(',').map(s => s.trim()) : []
+                featureNames: formData.featureNames ? formData.featureNames.split(', ').map(s => s.trim()) : []
             }
 
-            const response = await fetch('/api/datasets', {
+            const response = await fetch('http://localhost:8080/api/datasets', {
+                headers: { 'Content-Type': 'application/json' },
                 method: 'POST',
                 body: JSON.stringify(payload)
             });
-            setResult({ type: 'success', message: `Dataset created! ID: ${response.data.id}` });
+            const responseData = await response.json();
+            setResult({ type: 'success', message: `Dataset created! ID: ${responseData.data.id}` });
             setFormData({
                 name: '',
                 description: '',
@@ -44,7 +46,7 @@ function DatasetUpload({onSuccess}) {
         } catch (err) {
             setResult({
                 type: 'error',
-                message:err.response?.data?.error || err.message
+                message: err.response?.data?.error || err.message
             });
         } finally {
             setLoading(false)
@@ -55,7 +57,7 @@ function DatasetUpload({onSuccess}) {
         const lines = text.split('\n');
         const data = [];
         for (let i = 1; i < lines.length; i++) {
-            const value = lines[i].split(',').map(v => parseFloat(v.trim()));
+            const value = lines[i].split(', ').map(v => parseFloat(v.trim()));
             const feature = value.slice(0, -1);
             const label = value[value.length - 1];
             data.push({ feature, label });
@@ -71,7 +73,7 @@ function DatasetUpload({onSuccess}) {
                     type="text"
                     className="form-control"
                     value={formData.name}
-                    onChange={(e) => setFormData({...formData, name: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     required
                     placeholder="Example: Sales Analyse"
                 />
@@ -82,9 +84,9 @@ function DatasetUpload({onSuccess}) {
                 <textarea
                     className="form-control"
                     value={formData.description}
-                    onChange={(e) => setFormData({...formData, description: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     rows="3"
-                    placeholder="Short description of datas"/>
+                    placeholder="Short description of datas" />
             </div>
 
             <div className="form-group">
@@ -92,10 +94,10 @@ function DatasetUpload({onSuccess}) {
                 <textarea
                     className="form-control"
                     value={formData.data}
-                    onChange={(e) => setFormData({...formData, data: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, data: e.target.value })}
                     rows="8"
                     required
-                    placeholder={`CSV example:\nfeature1,feature2,label\n1.0,2.0,1\n0.5,1.5,0\n\nJSON example:\n[{"features":[1.0,2.0],"label":1}]`}
+                    placeholder={`CSV example:\nfeature1, feature2, label\n1.0, 2.0,1\n0.5, 1.5,0\n\nJSON example:\n[{"features":[1.0, 2.0], "label":1}]`}
                 />
             </div>
 
@@ -105,8 +107,8 @@ function DatasetUpload({onSuccess}) {
                     type="text"
                     className="form-control"
                     value={formData.featureNames}
-                    onChange={(e) => setFormData({...formData, featureNames: e.target.value})}
-                    placeholder="price,quantity,category"
+                    onChange={(e) => setFormData({ ...formData, featureNames: e.target.value })}
+                    placeholder="price, quantity, category"
                 />
             </div>
 
