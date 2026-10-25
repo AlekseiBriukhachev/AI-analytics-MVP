@@ -51,7 +51,7 @@ curl -f http://localhost:8080/actuator/health && echo "✅ Application is runnin
 
 echo "🚀 AI Analytics Platform started successfully!"
 echo "🌐 Access the platform at https://localhost:8080"
-echo " API Docs: http://localhost:8080/swagger-ui.html"
+echo " API Docs: http://localhost:8080/swagger-ui/index.html"
 echo " DB Admin: http://localhost:8080/h2-console"
 echo " Actuator: http://localhost:8080/actuator"
 echo "📄 Logs are available in the logs/ directory."

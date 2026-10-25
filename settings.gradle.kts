@@ -14,3 +14,6 @@ dependencyResolutionManagement {
     }
 }
 
+
+include("ai-analytics-api")
+include("ai-analytics-ui")
