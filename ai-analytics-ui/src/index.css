@@ -58,6 +58,11 @@ body {
     margin-bottom: 5px;
 }
 
+.stat-icon {
+    font-size: 1.5em;
+    margin-bottom: 8px;
+}
+
 .stat-label {
     color: #666;
     font-weight: 500;
@@ -210,6 +215,8 @@ body {
     border-radius: 8px;
     transition: all 0.3s;
     font-weight: 500;
+    border: 0;
+    font: inherit;
 }
 
 .tab.active {

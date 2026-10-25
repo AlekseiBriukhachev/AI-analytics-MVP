@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { apiRequest } from '../api';
 
 function ModelTraining({ onSuccess }) {
     const [datasets, setDatasets] = useState(null);
@@ -11,19 +12,20 @@ function ModelTraining({ onSuccess }) {
     });
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState(null);
+    const [error, setError] = useState(null);
 
     useEffect(() => {
         const loadDatasets = async () => {
             try {
-                const response = await fetch('http://localhost:8080/api/datasets');
-                const data = await response.json();
-                setDatasets(data?.data.content || []);
+                const data = await apiRequest('/api/datasets');
+                setDatasets(data?.data?.content || []);
             } catch (err) {
-                console.error('Failed to load datasets:', err);
+                setError(err.message);
+                setDatasets([]);
             }
         };
         loadDatasets();
-    }, [])
+    }, []);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -31,22 +33,28 @@ function ModelTraining({ onSuccess }) {
         setResult(null);
 
         try {
+            const hiddenLayers = formData.hiddenLayers
+                .split(',')
+                .map(value => Number(value.trim()));
+            if (hiddenLayers.some(size => !Number.isInteger(size) || size <= 0)) {
+                throw new Error('Hidden layers must be positive whole numbers separated by commas.');
+            }
+
             const payload = {
                 datasetId: formData.datasetId,
                 config: {
-                    hiddenLayers: formData.hiddenLayers.split(', ').map(n => parseInt(n.trim())),
+                    hiddenLayers,
                     learningRate: parseFloat(formData.learningRate),
                     epochs: parseInt(formData.epochs)
                 },
                 testSplit: parseFloat(formData.testSplit)
             };
 
-            const response = await fetch('http://localhost:8080/api/models/train', {
+            const data = await apiRequest('/api/models/train', {
                 headers: { 'Content-Type': 'application/json' },
                 method: 'POST',
                 body: JSON.stringify(payload)
             });
-            const data = await response.json();
             setResult({
                 type: 'success',
                 message: 'Model trained successfully!',
@@ -54,10 +62,9 @@ function ModelTraining({ onSuccess }) {
             });
             onSuccess();
         } catch (err) {
-            console.error('Training failed:', err);
             setResult({
                 type: 'error',
-                message: err.response?.data?.error || err.message
+                message: err.message
             });
         } finally {
             setLoading(false);
@@ -65,8 +72,11 @@ function ModelTraining({ onSuccess }) {
     }
     return (
         <div>
-            {datasets == null || datasets.length <= 0 ? (
-                <p>No datasets to train models</p>
+            {error && <div className="alert alert-error" role="alert">{error}</div>}
+            {datasets === null ? (
+                <p>Loading datasets...</p>
+            ) : datasets.length === 0 ? (
+                <p>No datasets to train models.</p>
             ) : (
                 <form onSubmit={handleSubmit}>
                     <div className="form-group">
@@ -80,7 +90,7 @@ function ModelTraining({ onSuccess }) {
                             <option value="">Choose dataset</option>
                             {datasets.map(dataset => (
                                 <option key={dataset.id} value={dataset.id}>
-                                    {dataset.name} ({dataset.record_count} records, {dataset.feature_count} features)
+                                    {dataset.name} ({dataset.recordCount} records, {dataset.featureCount} features)
                                 </option>
                             ))}
                         </select>
@@ -91,9 +101,10 @@ function ModelTraining({ onSuccess }) {
                         <input
                             type="text"
                             className="form-control"
-                            value={formData.hidden_layers}
+                            value={formData.hiddenLayers}
                             onChange={(e) => setFormData({ ...formData, hiddenLayers: e.target.value })}
                             placeholder="Example: 10, 5"
+                            required
                         />
                     </div>
 
@@ -102,11 +113,12 @@ function ModelTraining({ onSuccess }) {
                         <input
                             type="number"
                             className="form-control"
-                            value={formData.learning_rate}
+                            value={formData.learningRate}
                             onChange={(e) => setFormData({ ...formData, learningRate: e.target.value })}
                             step="0.001"
                             min="0.0001"
                             max="1"
+                            required
                         />
                     </div>
 
@@ -119,10 +131,25 @@ function ModelTraining({ onSuccess }) {
                             onChange={(e) => setFormData({ ...formData, epochs: e.target.value })}
                             min="10"
                             max="50000"
+                            required
                         />
                     </div>
 
-                    <button type="submit" className="btn" disabled={loading}>
+                    <div className="form-group">
+                        <label>Test data split</label>
+                        <input
+                            type="number"
+                            className="form-control"
+                            value={formData.testSplit}
+                            onChange={(e) => setFormData({ ...formData, testSplit: e.target.value })}
+                            step="0.05"
+                            min="0.1"
+                            max="0.5"
+                            required
+                        />
+                    </div>
+
+                    <button type="submit" className="btn" disabled={loading                    }>
                         {loading ? (
                             <div className="loading">
                                 <div className="spinner"></div>
@@ -134,18 +161,18 @@ function ModelTraining({ onSuccess }) {
                     {result && (
                         <div className={`alert alert-${result.type}`}>
                             {result.message}
-                            {result.data && (
+                            {result.details && (
                                 <div className="metrics-grid">
                                     <div className="metric">
-                                        <div className="metric-value">{(result.data.accuracy * 100).toFixed(1)}%</div>
+                                        <div className="metric-value">{(result.details.accuracy * 100).toFixed(1)}%</div>
                                         <div className="metric-label">Accuracy</div>
                                     </div>
                                     <div className="metric">
-                                        <div className="metric-value">{result.data.loss.toFixed(4)}</div>
+                                        <div className="metric-value">{result.details.loss.toFixed(4)}</div>
                                         <div className="metric-label">Losses</div>
                                     </div>
                                     <div className="metric">
-                                        <div className="metric-value">{result.data.training_time}ms</div>
+                                        <div className="metric-value">{result.details.trainingTime}ms</div>
                                         <div className="metric-label">Time</div>
                                     </div>
                                 </div>

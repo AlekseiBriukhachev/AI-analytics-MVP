@@ -1,4 +1,4 @@
-function ModelList({ models, onRefresh }) {
+function ModelList({ models }) {
     const getStatusColor = (status) => {
         switch (status) {
             case 'TRAINED': return '#28a745';
@@ -34,9 +34,9 @@ function ModelList({ models, onRefresh }) {
                             {model.accuracy > 0 && (
                                 <span>🎯 {(model.accuracy * 100).toFixed(1)}% accuracy</span>
                             )}
-                            <span>⚡ {model.epochs} epoch</span>
-                            <span>⏱️ {model.training_time}ms</span>
-                            <span>📅 {new Date(model.created_at).toLocaleDateString()}</span>
+                            <span>⚡ {model.epochs} epochs</span>
+                            <span>⏱️ {model.trainingTime}ms</span>
+                            <span>📅 {new Date(model.createdAt).toLocaleDateString()}</span>
                         </div>
                     </div>
                 ))

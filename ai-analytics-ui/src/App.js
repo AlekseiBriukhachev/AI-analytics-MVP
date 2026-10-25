@@ -3,6 +3,7 @@ import Header from './components/Header';
 import StatsGrid from './components/StatsGrid';
 import MainContent from './components/MainContent';
 import { useState, useEffect, useCallback } from 'react';
+import { apiRequest } from './api';
 
 
 function App() {
@@ -13,39 +14,36 @@ function App() {
     const loadDashboard = useCallback(async () => {
         try {
             setLoading(true);
-            const response = await fetch('api/analytics/dashboard');
-            setDashboard(response.data);
+            const data = await apiRequest('/api/analytics/dashboard');
+            setDashboard(data);
             setError(null);
         } catch (err) {
-            setError(err.response?.data?.message || err.message);
+            setError(err.message);
             setDashboard(null);
         } finally {
             setLoading(false);
         }
     }, []);
 
-    // useEffect(() => {
-    //     loadDashboard();
-    //     const interval = setInterval(loadDashboard, 30000); // Refresh every 30 seconds
-    //     return () => clearInterval(interval);
-    // }, [loadDashboard]);
-
-    // if (loading && !dashboard) {
-    //     return (
-    //         <div className="app-container">
-    //             <div className="loading">
-    //                 <span>Platform loading...</span>
-    //             </div>
-    //         </div>
-    //     );
-    // }
+    useEffect(() => {
+        loadDashboard();
+    }, [loadDashboard]);
 
     return (
         <div className="app-container fade-in">
             <Header />
+            {loading && !dashboard && (
+                <div className="loading" role="status">
+                    <div className="spinner"></div>
+                    <span>Loading platform...</span>
+                </div>
+            )}
             {error && (
-                <div className="alert alert-error">
+                <div className="alert alert-error" role="alert">
                     <span>Loading error: {error}</span>
+                    <button type="button" className="btn btn-secondary retry-button" onClick={loadDashboard}>
+                        Retry
+                    </button>
                 </div>
             )}
             {dashboard && <StatsGrid stats={dashboard} />}

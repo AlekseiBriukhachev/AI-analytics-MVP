@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import { apiRequest } from '../api';
 
 function ModelPrediction({ models }) {
+    const trainedModels = models.filter(model => model.status === 'TRAINED');
     const [formData, setFormData] = useState({
         modelId: '',
         features: ''
@@ -14,27 +16,30 @@ function ModelPrediction({ models }) {
         setResult(null);
 
         try {
+            const featureValues = formData.features.split(',').map(value => value.trim());
+            const features = featureValues.map(Number);
+            if (featureValues.some(value => value === '') || features.some(value => !Number.isFinite(value))) {
+                throw new Error('Enter numeric feature values separated by commas.');
+            }
             const payload = {
                 modelId: formData.modelId,
-                features: formData.features.split(', ').map(x => parseFloat(x.trim()))
+                features
             };
 
-            const response = await fetch('http://localhost:8080/api/models/predict', {
+            const data = await apiRequest('/api/models/predict', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
-            const data = await response.json();
             setResult({
-                type: response.ok ? 'success' : 'error',
-                message: response.ok ? 'Prediction successful!' : (data.error || 'Prediction failed.'),
+                type: 'success',
+                message: 'Prediction successful!',
                 details: data.data
             });
         } catch (err) {
-            console.error('Prediction failed:', err);
             setResult({
                 type: 'error',
-                message: err.response?.data?.error || err.message
+                message: err.message
             });
         } finally {
             setLoading(false);
@@ -43,7 +48,7 @@ function ModelPrediction({ models }) {
 
     return (
         <div>
-            {models == null || models.length <= 0 ? (
+            {trainedModels.length === 0 ? (
                 <p>No trained models available for prediction.</p>
             ) : (
                 <form onSubmit={handleSubmit}>
@@ -56,7 +61,7 @@ function ModelPrediction({ models }) {
                             required
                         >
                             <option value="">Choose the model</option>
-                            {models.filter(m => m.status === 'TRAINED').map(model => (
+                            {trainedModels.map(model => (
                                 <option key={model.id} value={model.id}>
                                     Model {model.id.substring(0, 8)}... (accuracy: {(model.accuracy * 100).toFixed(1)}%)
                                 </option>
@@ -88,18 +93,18 @@ function ModelPrediction({ models }) {
                     {result && (
                         <div className={`alert alert-${result.type}`}>
                             {result.message}
-                            {result.data && (
+                            {result.details && (
                                 <div className="metrics-grid">
                                     <div className="metric">
-                                        <div className="metric-value">{result.data.prediction.toFixed(4)}</div>
+                                        <div className="metric-value">{result.details.prediction.toFixed(4)}</div>
                                         <div className="metric-label">Prediction</div>
                                     </div>
                                     <div className="metric">
-                                        <div className="metric-value">{(result.data.confidence * 100).toFixed(1)}%</div>
+                                        <div className="metric-value">{(result.details.confidence * 100).toFixed(1)}%</div>
                                         <div className="metric-label">Confidence</div>
                                     </div>
                                     <div className="metric">
-                                        <div className="metric-value">{result.data.predictedClass}</div>
+                                        <div className="metric-value">{result.details.predictedClass}</div>
                                         <div className="metric-label">Class</div>
                                     </div>
                                 </div>

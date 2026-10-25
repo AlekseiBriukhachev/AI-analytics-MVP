@@ -1,4 +1,47 @@
 import { useState } from 'react';
+import { apiRequest } from '../api';
+
+export function parseCsv(text) {
+    const rows = text
+        .split(/\r?\n/)
+        .map(line => line.trim())
+        .filter(Boolean)
+        .map(line => line.split(',').map(value => value.trim()));
+
+    if (rows.length === 0) {
+        throw new Error('Enter at least one row of data.');
+    }
+
+    const hasHeader = rows[0].every(value => value !== '' && !Number.isFinite(Number(value)));
+    const headers = hasHeader ? rows.shift() : null;
+    if (headers && headers.length < 2) {
+        throw new Error('CSV headers must include at least one feature and a label.');
+    }
+    const data = rows.map((row, index) => {
+        if (row.length < 2 || row.some(value => value === '' || !Number.isFinite(Number(value)))) {
+            throw new Error(`Row ${index + (hasHeader ? 2 : 1)} must contain numeric features and a numeric label.`);
+        }
+
+        return {
+            features: row.slice(0, -1).map(Number),
+            label: Number(row[row.length - 1])
+        };
+    });
+
+    if (data.length === 0) {
+        throw new Error('Enter at least one row of data.');
+    }
+
+    const featureCount = data[0].features.length;
+    if (data.some((point, index) => (
+        point.features.length !== featureCount ||
+        (headers && rows[index].length !== headers.length)
+    ))) {
+        throw new Error('Each row must contain the same number of features.');
+    }
+
+    return { data, headers };
+}
 
 function DatasetUpload({ onSuccess }) {
     const [formData, setFormData] = useState({
@@ -17,24 +60,35 @@ function DatasetUpload({ onSuccess }) {
 
         try {
             let data;
+            let csvHeaders = null;
             if (formData.data.trim().startsWith('[')) {
                 data = JSON.parse(formData.data);
+                if (!Array.isArray(data)) {
+                    throw new Error('JSON dataset data must be an array.');
+                }
             } else {
-                data = parseCSV(formData.data);
+                const parsedCsv = parseCsv(formData.data);
+                data = parsedCsv.data;
+                csvHeaders = parsedCsv.headers;
             }
+            const featureNames = formData.featureNames
+                .split(',')
+                .map(name => name.trim())
+                .filter(Boolean);
             const payload = {
                 name: formData.name,
                 description: formData.description || null,
                 data: data,
-                featureNames: formData.featureNames ? formData.featureNames.split(', ').map(s => s.trim()) : []
-            }
+                featureNames: featureNames.length
+                    ? featureNames
+                    : (csvHeaders ? csvHeaders.slice(0, -1) : [])
+            };
 
-            const response = await fetch('http://localhost:8080/api/datasets', {
+            const responseData = await apiRequest('/api/datasets', {
                 headers: { 'Content-Type': 'application/json' },
                 method: 'POST',
                 body: JSON.stringify(payload)
             });
-            const responseData = await response.json();
             setResult({ type: 'success', message: `Dataset created! ID: ${responseData.data.id}` });
             setFormData({
                 name: '',
@@ -46,24 +100,12 @@ function DatasetUpload({ onSuccess }) {
         } catch (err) {
             setResult({
                 type: 'error',
-                message: err.response?.data?.error || err.message
+                message: err.message
             });
         } finally {
             setLoading(false)
         }
     };
-
-    const parseCSV = (text) => {
-        const lines = text.split('\n');
-        const data = [];
-        for (let i = 1; i < lines.length; i++) {
-            const value = lines[i].split(', ').map(v => parseFloat(v.trim()));
-            const feature = value.slice(0, -1);
-            const label = value[value.length - 1];
-            data.push({ feature, label });
-        }
-        return data;
-    }
 
     return (
         <form onSubmit={handleSubmit}>

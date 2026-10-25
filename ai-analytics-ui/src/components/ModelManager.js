@@ -2,18 +2,20 @@ import ModelTraining from './ModelTraining';
 import ModelPrediction from './ModelPrediction';
 import ModelList from './ModelList';
 import { useState, useEffect, useCallback } from 'react';
+import { apiRequest } from '../api';
 
 function ModelManager({ onRefresh }) {
     const [activeTab, setActiveTab] = useState('train');
     const [models, setModels] = useState([]);
+    const [error, setError] = useState(null);
 
     const loadModels = useCallback(async () => {
         try {
-            const response = await fetch('http://localhost:8080/api/models');
-            const data = await response.json();
-            setModels(data?.data || [])
+            const data = await apiRequest('/api/models');
+            setModels(data?.data || []);
+            setError(null);
         } catch (err) {
-            console.error('Failed to load models:', err);
+            setError(err.message);
         }
     }, []);
 
@@ -24,26 +26,36 @@ function ModelManager({ onRefresh }) {
     return (
         <div className="section">
             <h2>🤖 Machine Learning</h2>
-            <div className="tabs">
-                <div
+            <div className="tabs" role="tablist" aria-label="Machine learning">
+                <button
+                    type="button"
+                    role="tab"
+                    aria-selected={activeTab === 'train'}
                     className={`tab ${activeTab === 'train' ? 'active' : ''}`}
                     onClick={() => setActiveTab('train')}
                 >
                     Train
-                </div>
-                <div
+                </button>
+                <button
+                    type="button"
+                    role="tab"
+                    aria-selected={activeTab === 'models'}
                     className={`tab ${activeTab === 'models' ? 'active' : ''}`}
                     onClick={() => setActiveTab('models')}
                 >
                     Models
-                </div>
-                <div
+                </button>
+                <button
+                    type="button"
+                    role="tab"
+                    aria-selected={activeTab === 'predict'}
                     className={`tab ${activeTab === 'predict' ? 'active' : ''}`}
                     onClick={() => setActiveTab('predict')}
                 >
                     Predict
-                </div>
+                </button>
             </div>
+            {error && <div className="alert alert-error" role="alert">{error}</div>}
 
             {activeTab === 'train' && (
                 <ModelTraining onSuccess={() => { loadModels(); onRefresh(); }} />
